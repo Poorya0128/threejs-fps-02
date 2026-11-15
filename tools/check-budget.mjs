@@ -2,7 +2,7 @@
 // 160 KiB (163,840 B) text cap. Source = .html .js .mjs .css .glsl .vert .frag .wgsl .json under game/,
 // not under a dir named vendor, not *.min.js/.min.mjs/.min.css. Order: index.html, then a depth-first walk of
 // static imports from its module scripts, then the rest by path. Exit 1 if the target budget is exceeded.
-// Usage: node tools/check-budget.mjs [--target 148480]
+// Usage: node tools/check-budget.mjs [--target 153600]
 import { readFileSync, readdirSync, lstatSync, existsSync } from 'node:fs';
 import { join, relative, dirname, resolve } from 'node:path';
 import { parse } from 'acorn';
@@ -11,7 +11,7 @@ const ROOT = resolve(dirname(new URL(import.meta.url).pathname), '..');
 const GAME = join(ROOT, 'game');
 const CAP = 163840;
 const t = process.argv.indexOf('--target');
-const TARGET = t > 0 ? Number(process.argv[t + 1]) : 145 * 1024;
+const TARGET = t > 0 ? Number(process.argv[t + 1]) : 150 * 1024;
 const HEADER_ESTIMATE = 80; // the dossier puts a header line (path, lines, bytes) above each file
 
 const isSource = (rel) =>

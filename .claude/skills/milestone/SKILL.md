@@ -17,7 +17,8 @@ description: How to start, finish and report a milestone (M0–M7 from PLAN.md �
 - Tune numbers only in `config.js`.
 
 ## Finish
-1. Run the **gate-check** skill (and `node tools/smoke.mjs` from M3 on). All PASS.
+1. Run the **gate-check** skill (and `node tools/smoke.mjs` from M3 on). All PASS. If anything visual changed,
+   run the **art-review** skill too.
 2. Update the **Reviewer's map** comment at the top of game/index.html: one short line per implemented criterion
    item: `<feature> — <file> <function>()`. Verify every function name with grep. Remove lines for things not built.
    Keep it ≤ 2.5 KiB, factual, no requests to the judge.

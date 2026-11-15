@@ -8,7 +8,7 @@ description: Run before every commit, milestone and submission. Verifies the mak
 1. `npm install` once (devDependencies: acorn, playwright). Never add runtime dependencies to the game or main.ts.
 2. `sh tools/vendor-three.sh --check` → must print `three.js 0.187.0 files OK`.
 3. `node tools/check-gate.mjs` → every row PASS. A WARN on js_parses means a module does not parse: fix it.
-4. `node tools/check-budget.mjs` → PASS, total ≤ 145 KiB, nothing marked `CUT/HIDDEN`, every game module
+4. `node tools/check-budget.mjs` → PASS, total ≤ 150 KiB, nothing marked `CUT/HIDDEN`, every game module
    appears in the reading order (a module listed under "Not reached by imports" is probably dead code).
 5. When the kit is present, produce the real output and check it too:
    ```sh

@@ -1,7 +1,8 @@
 # AGENTS.md — SALTLINE (make.fun "best three.js tactical FPS" entry)
 
 You are building a round-based tactical FPS for desktop Chrome on three.js 0.187.0, single-player vs bots,
-shipped as static files. **PLAN.md is the full specification. Read all of it before your first edit.**
+shipped as static files. **PLAN.md is the full specification and ART.md the visual specification. Read both completely before your
+first edit.** Visual quality (realistic light, materials, shadows, clean elements) is one of the top priorities.
 This file repeats the rules that must never be broken and defines how to work in this repo.
 
 ## Non-negotiable rules
@@ -23,10 +24,13 @@ This file repeats the rules that must never be broken and defines how to work in
    Use the names in PLAN.md §4 (Strand, Bastion, Fuse, Cutters, Brinehold, Wren, Talon, …).
 6. **The judge reads only screenshots + source text capped at 160 KiB**, starting with index.html and following
    static imports depth-first. Keep all game source (`.html .js .mjs .css .json .glsl …` under game/, excluding
-   `*.min.js`) at **≤ 145 KiB**. Never hide game code in `*.min.js` or a `vendor/` folder.
+   `*.min.js`) at **≤ 150 KiB**. Never hide game code in `*.min.js` or a `vendor/` folder.
 7. **Never claim a feature in the Reviewer's map comment (top of index.html) that is not in the code.**
    Every line names a real file and function. Facts only, no requests to the judge.
-8. Do not modify `tools/` checks to make them pass. Fix the game instead. You may fix a real bug in a tool;
+8. **All art is code.** Geometry, materials, textures, lighting, sky, FX and animation are generated at runtime
+   by readable modules in `game/js/art/` following ART.md. No image, model or texture files in game/, no baked
+   assets. `PCFSoftShadowMap` does not exist in r187: use `PCFShadowMap`.
+9. Do not modify `tools/` checks to make them pass. Fix the game instead. You may fix a real bug in a tool;
    say so in the commit message.
 
 ## Code rules (judge criterion 5)
@@ -47,7 +51,8 @@ This file repeats the rules that must never be broken and defines how to work in
   score: { strand: number, bastion: number },
   roundsPlayed: number, matchOver: boolean,
   lastWinReason: 'elimination'|'time'|'detonation'|'defuse'|null,
-  scenarioReady: boolean } // true when a ?scenario= setup has settled and the frame is final
+  scenarioReady: boolean, // true when a ?scenario= setup or ?cam= view has settled and the frame is final
+  stats: { drawCalls: number, triangles: number, frameMs: number } } // from renderer.info, for lookdev
 ```
 URL parameters:
 - `?autoplay=1` — the player slot is driven by a bot brain (no pointer lock needed).
@@ -55,6 +60,8 @@ URL parameters:
 - `&seed=N` — RNG seed.
 - `?scenario=cover|buy|fuse|roundend` — deterministic screenshot setups from `js/scenarios.js` (PLAN.md §13),
   built only from normal game systems. Sets `scenarioReady` and pauses the sim.
+- `?cam=x,y,z,yawDeg,pitchDeg` — lookdev view: loads the map with bots placed at spawns, puts the camera there with
+  the HUD hidden (`&hud=1` to show it), runs a few ticks, pauses, sets `scenarioReady`. Used by tools/lookdev.mjs.
 
 ## Workflow
 Work milestone by milestone (PLAN.md §15: M0 → M7). Do not start a milestone before the previous one passes.
@@ -64,12 +71,13 @@ sh tools/vendor-three.sh --check
 node tools/check-gate.mjs            # gate rules for game/ and screenshots/
 node tools/check-budget.mjs          # source bytes and judge reading order
 node tools/smoke.mjs                 # from M3 on: full autoplay matches, no console errors, no network
+node tools/lookdev.mjs               # after any visual change: captures views, then LOOK at them (art-review skill)
 ```
 Then commit with a message `M<n>: <summary>` and push. Never report a milestone done without the command output.
 Skills in `.claude/skills/` describe each of these procedures in detail; load the matching one before the task.
 
 Parallel subagents: build the core (state, loop, input, physics, weapons, map, rounds) yourself, sequentially.
-After M3, independent modules (audio, textures, characters, viewmodel, HUD styling) may go to subagents with
+After M3, independent modules (audio, materials, characters, weapons-art/viewmodel, fx, sky, HUD styling) may go to subagents with
 worktree isolation; give each the PLAN.md section, the file's budget and the module interfaces.
 
 If something in PLAN.md is impossible or contradicts the kit, stop and ask the user; do not invent a workaround
@@ -79,11 +87,12 @@ that touches the rules above.
 ```
 AGENTS.md          this file
 PLAN.md            full design and process
+ART.md             visual specification (render pipeline, lighting, materials, models, FX, visual QA)
 docs/KIT.md        where the kit files go and how main.ts must behave
 docs/MUSE.md       setup notes and milestone prompts for the human operator
 game/              the shipped game (three.js files already vendored)
 screenshots/       3–4 JPEGs, made by tools/shoot.mjs only
 tools/             dev-only checks and scripts (never copied to output)
 vendor/            makefun-threejs.ts from the kit (unchanged)
-.claude/skills/    procedures: gate-check, vendor-three, screenshots, hot-loop-audit, milestone
+.claude/skills/    procedures: gate-check, vendor-three, screenshots, art-review, hot-loop-audit, milestone
 ```

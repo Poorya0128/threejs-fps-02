@@ -22,7 +22,7 @@ for a few minutes (`node tools/serve.mjs` then open http://127.0.0.1:8080/ in Ch
 
 ### Prompt templates
 **M0**
-> Read AGENTS.md and PLAN.md completely. Then do milestone M0 from PLAN.md §15: run `npm install` and
+> Read AGENTS.md, PLAN.md and ART.md completely. Then do milestone M0 from PLAN.md §15: run `npm install` and
 > `npx playwright install chromium`, place the kit files I give you (docs/KIT.md), write main.ts from the starter,
 > create a minimal game/index.html with the import map and a lit rotating box, and run the gate-check skill.
 > Show all command outputs. Commit "M0: pipeline" and push.
@@ -33,10 +33,20 @@ for a few minutes (`node tools/serve.mjs` then open http://127.0.0.1:8080/ in Ch
 > Reviewer's map, commit "M<n>: …", push, and report outputs, known issues and what I should play-test.
 
 **Parallel work (after M3 only)**
-> Spawn subagents with worktree isolation for: (1) js/audio.js per PLAN.md §12b, (2) js/art/textures.js per §11,
-> (3) js/art/characters.js per §11, (4) HUD styling in index.html per §12. Give each its PLAN.md section, its byte
-> budget from §5.2, and the interfaces it must use. Review and merge each result; run gate-check and smoke after
-> merging.
+> Spawn subagents with worktree isolation for: (1) js/audio.js per PLAN.md §12b, (2) js/art/materials.js per ART.md §5,
+> (3) js/art/characters.js per ART.md §7, (4) js/art/weapons-art.js + viewmodel.js per ART.md §9,
+> (5) HUD styling in index.html per PLAN.md §12. Give each its spec section, its byte budget (PLAN.md §5.2,
+> ART.md §11), and the interfaces it must use. Review and merge each result; run gate-check, smoke and
+> art-review after merging.
+> Do the lighting/pipeline step (ART.md §2–§3) yourself first: every art subagent depends on it.
+
+**Visual pass (M5, one prompt per step, in this order)**
+> Do ART.md §2 and §3 (pipeline, post, lighting, PMREM, shadows). Load the art-review skill, capture lookdev
+> views before and after, show me both, and list every checklist failure you fixed and any that remain.
+
+Then the same prompt for §4–§5 (geometry kit, AO, materials), §6 and §8 (decals, signs, sky, fog, atmosphere),
+§7 (characters), §9 (weapons and viewmodel), §10 (FX). Ask for before/after images every time and look at them
+yourself.
 
 **Feedback after play-testing** (examples)
 > Recoil on the Talon feels too weak: the 10th bullet should be ~2× higher than now. Bots on Regular

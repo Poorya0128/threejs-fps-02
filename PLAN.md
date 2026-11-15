@@ -106,7 +106,7 @@ It compares two entries on five ranked criteria, and **the first criterion where
 Consequences, in priority order:
 
 1. **Every feature must be provable in code the judge actually reads.** Keep all game source under
-   **~145 KiB** so nothing is truncated. Never hide game logic in `*.min.js` or `vendor/`; unseen code
+   **~150 KiB** so nothing is truncated. Never hide game logic in `*.min.js` or `vendor/`; unseen code
    counts as "a screen with no code behind it".
 2. **Put a factual "Reviewer's map" comment at the top of index.html** (≤ 2.5 KiB): one line per criterion item,
    naming the file and function that implements it. Example lines:
@@ -234,42 +234,38 @@ with a fallback call without options. Resume `AudioContext` on the same click.
 - `?autoplay=1&speed=8` runs bots-only matches at N sim ticks per frame. It proves the sim/render split and
   powers the smoke test.
 
-### 5.2 Files and byte budgets (total source target ≤ 145 KiB)
+### 5.2 Files and byte budgets (total source target ≤ 150 KiB, hard cap 160 KiB)
 Import order in `main.js` follows this table top to bottom (it is the judge's reading order).
+Visual quality is a top priority, so art has a large share (ART.md §11); gameplay code must be compact.
 
 | File | Job | Budget |
 |---|---|---|
-| `index.html` | Reviewer's map comment, import map, HUD/menus markup, CSS | 14 KiB |
-| `js/main.js` | boot, fixed-step loop, wiring, autoplay/scenario params | 5 |
-| `js/config.js` | all tunables: weapons, economy, timings, palette, bot skill | 8 |
-| `js/state.js` | `createState()`, `createAgent()`, reset helpers | 4 |
-| `js/math.js` | scratch vectors, RNG, ray–AABB slab, ray–sphere/capsule, clamp/lerp/damp | 5 |
-| `js/input.js` | keyboard/mouse/pointer lock → `state.input` | 3 |
-| `js/physics.js` | `accelerate`, `applyFriction`, gravity, jump, `setCrouch`, `collideCapsule` vs AABBs, step-up | 7 |
-| `js/weapons.js` | fire, `computeSpread`, `applyRecoil` (pattern + recovery), reload, switch, `traceShot`, `applyHit` | 12 |
-| `js/grenades.js` | throw arcs, bounce, frag damage, smoke volumes, flash blindness | 6 |
-| `js/nav.js` | waypoint graph, auto-linking, A* with reused buffers | 4 |
-| `js/bots.js` | bot brain: FSM, routes, holds, `canSee`, `onNoise`, aiming, buying, comms | 18 |
-| `js/rounds.js` | phase machine, win checks, `plantCharge`, `defuseCharge`, side swap, spectate | 8 |
-| `js/economy.js` | `awardRoundMoney`, kill rewards, `buyItem` (shared by player and bots) | 4 |
-| `js/map.js` | Brinehold layout data (boxes, zones, spawns, nav nodes, callouts), collider list | 12 |
-| `js/art/textures.js` | canvas textures: concrete, salt crust, corrugated metal, tiles, hazard, crate | 7 |
-| `js/art/world.js` | batch boxes → merged geometry per material, props (InstancedMesh), sky, lights, fog | 8 |
-| `js/art/characters.js` | low-poly soldier from primitives, team colours, procedural walk/crouch/aim pose | 6 |
-| `js/art/viewmodel.js` | weapon models from primitives, sway, bob, kick, reload animation, separate pass | 6 |
-| `js/art/fx.js` | pooled muzzle flash, tracers, impact sparks, decals, smoke particles, explosion | 6 |
-| `js/render.js` | renderer, cameras, interpolation, resize, two-pass render | 4 |
-| `js/hud.js` | HUD fields, crosshair from spread, radar, killfeed, buy menu, scoreboard, banners | 10 |
-| `js/audio.js` | WebAudio synth: shots per weapon, footsteps, reload, beeps, explosion; 3D panners | 7 |
+| `index.html` | Reviewer's map comment, import map, HUD/menus markup, CSS | 10 KiB |
+| `js/main.js` | boot, fixed-step loop, wiring, autoplay/scenario/cam params | 4 |
+| `js/config.js` | all tunables: weapons, economy, timings, palette, material presets, bot skill | 8 |
+| `js/state.js` | `createState()`, `createAgent()`, reset helpers | 3 |
+| `js/math.js` | scratch vectors, RNG, ray–AABB slab, ray–sphere/capsule, clamp/lerp/damp, springs | 4 |
+| `js/input.js` | keyboard/mouse/pointer lock → `state.input` | 2.5 |
+| `js/physics.js` | `accelerate`, `applyFriction`, gravity, jump, `setCrouch`, `collideCapsule` vs AABBs, step-up | 6 |
+| `js/weapons.js` | fire, `computeSpread`, `applyRecoil` (pattern + recovery), reload, switch, `traceShot`, `applyHit` | 9 |
+| `js/grenades.js` | throw arcs, bounce, frag damage, smoke volumes, flash blindness | 5 |
+| `js/nav.js` | waypoint graph, auto-linking, A* with reused buffers | 3.5 |
+| `js/bots.js` | bot brain: FSM, routes, holds, `canSee`, `onNoise`, aiming, buying, comms | 14 |
+| `js/rounds.js` | phase machine, win checks, `plantCharge`, `defuseCharge`, side swap, spectate | 6.5 |
+| `js/economy.js` | `awardRoundMoney`, kill rewards, `buyItem` (shared by player and bots) | 3 |
+| `js/map.js` | Brinehold layout data (boxes, kit pieces, props, decals, lights, zones, nav, callouts) | 10 |
+| `js/render.js` | renderer, cameras, interpolation, resize, pass order | 2.5 |
+| `js/art/*.js` | post, lighting, materials, geo, sky, characters, weapons-art, viewmodel, fx (ART.md §11) | 44.5 |
+| `js/hud.js` | HUD fields, crosshair from spread, radar, killfeed, buy menu, scoreboard, banners | 7 |
+| `js/audio.js` | WebAudio synth: shots per weapon, footsteps, reload, beeps, explosion; 3D panners | 5 |
 | `js/scenarios.js` | 4 named deterministic setups for screenshots (§13), ~60 lines | 2 |
-| **Total** | | **~166 → must be trimmed to ≤ 145** |
+| **Total** | | **~149.5 KiB** |
 
-The table sums high on purpose: budgets are ceilings. Write compact, readable code (short functions, no
+Budgets are ceilings. Write compact, readable code (short functions, data tables instead of repeated code, no
 banner comments, no commented-out code, JSDoc only where types are unclear). Run `tools/check-budget.mjs`
-after every milestone. If over 150 KiB, cut verbosity first, then the lowest-value polish. Never cut a
-criterion feature. Last resort: move the map's numeric layout table to `game/assets/brinehold.json`.
-JSON counts as source too, so that only helps if you instead store it as a non-source asset
-(e.g. `.dat`) loaded with `fetch('./assets/brinehold.dat')`. Prefer keeping it in JS.
+after every milestone (it fails above 150 KiB). If over, cut verbosity first, then the lowest-value polish.
+Never cut a criterion feature, and never move code or art into non-source files to dodge the budget: the look must
+come from code the judge can read.
 
 ### 5.3 Core types (plain objects, created once)
 ```js
@@ -393,29 +389,11 @@ Rules for the blockout:
 - Data format: `boxes: [[x,y,z, sx,sy,sz, materialId], ...]`, `zones` (spawns, buy, sites), `nodes`, `plans`, `lights`, `props`.
   The same box list feeds collision, rendering and the radar.
 
-## 11. Look (`js/art/*`, `render.js`)
-- Renderer: `WebGLRenderer({ antialias:true, powerPreference:'high-performance' })`, `outputColorSpace = SRGBColorSpace`,
-  `toneMapping = ACESFilmicToneMapping`, exposure ~1.1, `setPixelRatio(Math.min(devicePixelRatio, 1.5))`.
-- Lights: one low warm `DirectionalLight` with a 2048 PCF soft shadow map fitted tightly to the map, a teal/peach
-  `HemisphereLight`, 6–10 amber sodium `PointLight`s without shadows (distance-limited), emissive lamp heads.
-  Fog `FogExp2` tinted to the horizon colour. Sky: a small inverted sphere with a gradient `ShaderMaterial` + sun disc.
-- Materials: `MeshStandardMaterial` with **procedural canvas textures** (`textures.js`, 256–512 px): bleached concrete with stains,
-  salt crust with crystals, corrugated teal metal, rusted steel, cracked tiles, hazard stripes, crates, painted lane signs with
-  our own callout names ("PANS →", "BOILER") which help readability in screenshots.
-- **World-space UVs:** when batching boxes, set UVs per face from the face's world size (1 texture repeat per 2 m) so
-  nothing stretches. Merge all boxes of one material into one `BufferGeometry` (own code, no addons): ~10 draw calls for
-  the whole static map. Props (pipes, barrels, salt piles, lamp posts, conveyor rollers) via `InstancedMesh`.
-- Cheap baked AO: darken vertex colours near box bottoms and along the floor contact (vertex colour multiplier per height).
-- Characters (`characters.js`): stylised soldiers from boxes/capsules (helmet with visor, vest, backpack, boots), team colour
-  on visor, armbands and backpack; weapon in hands; procedural animation (leg swing from speed, crouch, aim pitch on torso,
-  recoil twitch, death fall). One shared geometry set and material per team; per-bot `Group`.
-- Viewmodel (`viewmodel.js`): gloves + sleeves + weapon built from primitives with distinct silhouettes per gun; sway from
-  mouse delta, bob from speed, kick from recoil, reload animation (mag out/in), inspect not needed. Rendered in a **second pass**
-  (`renderer.autoClear=false; render(world); clearDepth(); render(viewScene)`) with its own camera FOV 60° so it never clips walls.
-- FX (`fx.js`, all pooled): muzzle flash (additive quad + one reused PointLight pulse), tracers (stretched quads, every 3rd bullet),
-  impact sparks and salt dust, bullet decals (ring buffer of 96), smoke puffs, explosion flash, Fuse beacon pulse.
-- Performance target: 60 FPS at 1080p on integrated laptop GPUs: < 120 draw calls, < 150k triangles, zero GC spikes during firefights
-  (check Chrome Performance panel memory graph).
+## 11. Look → see ART.md
+The complete visual specification (art direction, render pipeline, lighting, shadows, image-based lighting,
+procedural PBR materials, bevelled geometry kit, baked AO, characters, weapons and viewmodel, FX, sky, budgets,
+performance and the visual QA loop) is in **ART.md**. Everything is generated in code at runtime; no image or
+model files. Note: `PCFSoftShadowMap` is removed in r187; use `PCFShadowMap` (see ART.md §3).
 
 ## 12. HUD and menus (`hud.js`, markup/CSS in index.html)
 Style: own visual language: angular panels with clipped corners, salt-white text, amber/teal team accents, monospace numerals
@@ -501,6 +479,9 @@ network capture).
 **M1 — Move in the map (1 day).** `state`, fixed-step loop with interpolation, input + pointer lock, physics (accel, friction,
 jump, walk, crouch, capsule collision, step-up), Brinehold blockout from box data with flat colours, spawns, zones, nav nodes
 drawn in a debug overlay (debug code removed before submission). Exit: walk every lane, no falling through, no snagging.
+Also set up the final render foundation now, so art is never bolted on at the end: HDR target + final tone-map
+pass (ART.md §2), sun with fitted shadow map + hemisphere + PMREM environment (§3), and `bevelBox` with
+world-space UVs (§4) used for the blockout from day one.
 
 **M2 — Gunplay (1–2 days).** Weapons table, hitscan vs world and hitboxes, spread, spray patterns, view kick, reload, ammo,
 switching, viewmodel, muzzle flash, tracers, decals, sounds, hit markers, HUD health/ammo, crosshair from spread. Static dummy
@@ -515,12 +496,14 @@ first provisional rate).
 full arsenal, armor/helm, three grenades, bot buying, team strategies, hearing, callouts, rotations, retakes, utility lineups,
 radar, killfeed, scoreboard. Exit: criteria 1–3 all present; Reviewer's map lists them. **Submission #2.**
 
-**M5 — Look and sound (2 days).** Procedural textures, world-space UVs, batching, lighting, shadows, sky, fog, props, characters,
-viewmodels per weapon, FX polish, audio pass, HUD styling, title screen. Performance pass. Final-quality screenshots.
+**M5 — Look and sound (3 days, the most important polish milestone).** Everything in ART.md, in its priority order:
+pipeline and post, lighting with IBL and shadows, procedural materials, bevelled geometry kit with baked AO, detail
+density, sky and fog, characters, weapons and viewmodel, FX. Run the art-review skill after every step. Audio pass,
+HUD styling, title screen. Performance pass (ART.md §12). Final-quality screenshots.
 **Submission #3.**
 
 **M6 — Code quality and judge readability (1 day).** Audit hot loops for allocations, remove dead code/debug code, merge any
-duplicated logic (player/bot paths), confirm state lives only in `state.js`, check module order, tighten to ≤ 145 KiB, finalise the
+duplicated logic (player/bot paths), confirm state lives only in `state.js`, check module order, tighten to ≤ 150 KiB, finalise the
 Reviewer's map (verify each line points to a real function name). **Submission #4.**
 
 **M7 — Playtest and final (1 day).** Manual play of 3 full matches per side at each difficulty; fix balance (bots must win some

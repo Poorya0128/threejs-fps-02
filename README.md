@@ -18,7 +18,7 @@ node tools/serve.mjs        # then open http://127.0.0.1:8080/ in desktop Chrome
 - `main.ts` — hands the game in: copies game/ and screenshots/ and writes dossier.json (Node 22.18+)
 - `vendor/makefun-threejs.ts` — make.fun kit library, unchanged
 - `tools/` — dev-only checks: gate, budget, smoke test, screenshots, static server
-- `PLAN.md`, `AGENTS.md`, `docs/` — design, agent rules, kit and operator notes
+- `PLAN.md`, `ART.md`, `AGENTS.md`, `docs/` — design, visual spec, agent rules, kit and operator notes
 
 ## Dev setup
 ```sh
@@ -27,10 +27,12 @@ npx playwright install chromium
 npm run check      # three.js bytes + gate rules + judge-text budget
 npm run smoke      # full bots-only matches in headless Chrome
 npm run shoot      # regenerate screenshots
+node tools/lookdev.mjs   # visual QA captures into out/lookdev/
 ```
 
 ## Progress
 - M0 scaffolding: three.js vendored and verified, tools and agent instructions in place. Kit files pending.
+- ART.md visual spec, art-review skill and lookdev tool added.
 
 ## Submission log
 | # | Date | Commit/tag | Provisional rate | Change |
