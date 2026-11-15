@@ -1,0 +1,51 @@
+<!doctype html>
+<!--
+Reviewer's map (M0: pipeline only — the game itself lands in M1–M7):
+- three.js 0.187.0 via the single import map below — game/three.module.min.js
+- Lit rotating box, sun + hemisphere light — js/main.js tick()
+-->
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>SALTLINE — Brinehold (M0 pipeline)</title>
+<style>
+  :root {
+    --ink: #e8e2d6;
+    --muted: #9a938a;
+    --accent: #f0a03c;
+    --panel: rgba(20, 22, 28, 0.72);
+  }
+  * { box-sizing: border-box; }
+  html, body {
+    margin: 0;
+    height: 100%;
+    overflow: hidden;
+    background: #2b2140;
+    color: var(--ink);
+    font-family: ui-monospace, Consolas, monospace;
+  }
+  #game, #game canvas { position: fixed; inset: 0; display: block; }
+  #caption {
+    position: fixed;
+    left: 16px;
+    bottom: 14px;
+    padding: 8px 12px;
+    background: var(--panel);
+    border-left: 3px solid var(--accent);
+    font-size: 12px;
+    line-height: 1.5;
+    letter-spacing: 0.04em;
+    pointer-events: none;
+  }
+  #caption b { color: var(--accent); font-weight: 600; }
+  #caption span { color: var(--muted); }
+</style>
+<script type="importmap">{ "imports": { "three": "./three.module.min.js" } }</script>
+</head>
+<body>
+<div id="game"></div>
+<div id="caption"><b>SALTLINE</b> — Brinehold <span>// M0 pipeline · three.js 0.187.0</span></div>
+<script type="module" src="./js/main.js"></script>
+</body>
+</html>
