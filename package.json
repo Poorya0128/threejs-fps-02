@@ -1,0 +1,19 @@
+{
+  "name": "saltline",
+  "version": "0.1.0",
+  "private": true,
+  "description": "Round-based tactical FPS on three.js 0.187.0 for the make.fun bounty (dev tooling only; the game needs no install).",
+  "type": "module",
+  "license": "MIT",
+  "engines": { "node": ">=22.18" },
+  "scripts": {
+    "serve": "node tools/serve.mjs",
+    "check": "sh tools/vendor-three.sh --check && node tools/check-gate.mjs && node tools/check-budget.mjs",
+    "smoke": "node tools/smoke.mjs",
+    "shoot": "node tools/shoot.mjs"
+  },
+  "devDependencies": {
+    "acorn": "^8.15.0",
+    "playwright": "^1.56.0"
+  }
+}

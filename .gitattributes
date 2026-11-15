@@ -1,0 +1,5 @@
+# Byte-exact files: never convert line endings.
+game/three.module.min.js -text
+game/three.core.min.js -text
+vendor/** -text
+screenshots/** binary
