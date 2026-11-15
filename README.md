@@ -33,6 +33,7 @@ node tools/lookdev.mjs   # visual QA captures into out/lookdev/
 ## Progress
 - M0 scaffolding: three.js vendored and verified, tools and agent instructions in place. Kit files pending.
 - ART.md visual spec, art-review skill and lookdev tool added.
+- M1 move in the map: state object, 64 Hz fixed-step loop with render interpolation, pointer-lock input, Quake-style physics (acceleration, friction, jump, walk, crouch, capsule vs AABB, step-up), Brinehold blockout (110x80 m, 44 nav nodes, A* auto-linked), final render foundation (HDR target + ACES final pass + 3-level bloom, fitted sun shadow map, hemisphere + PMREM environment, bevelBox with world-space UVs and baked AO). Shadow-side lift verified by looking at frames: hemi 0.65, env 0.85, exposure 1.3, dusty-rose fog, 3 fake bounce lights. Fixed during M1: bloom feedback loop (separate upsample chain), HDR target black frame (auto-clear wiping the world on the viewmodel pass; depth texture dropped from the multisampled target). Source 60.9 KiB of the 150 KiB target. No screenshots yet (M5); no weapons/rounds/bots yet (M2/M3).
 
 ## Submission log
 | # | Date | Commit/tag | Provisional rate | Change |

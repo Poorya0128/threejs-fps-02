@@ -1,86 +1,128 @@
-// SALTLINE M0: pipeline smoke test — a lit rotating box on salt ground.
-// Proves the import map, the renderer, the sun + shadow map and the frame
-// loop. Replaced by the full game boot in M1 (see PLAN.md §15).
+// SALTLINE main.js — boot, fixed-step loop, wiring (PLAN.md §5.1/§5.2).
+// M1: move in the map. The sim runs at 64 Hz with an accumulator (max 5
+// ticks/frame); rendering interpolates between ticks. Mouse look applies per
+// frame for responsiveness; the sim reads view angles at each tick.
 import * as THREE from 'three';
+import { TICK, MAX_TICKS_PER_FRAME, MOVE } from './config.js';
+import { mulberry32, clamp } from './math.js';
+import { MAP, buildBoxes } from './map.js';
+import { createState } from './state.js';
+import { createInput, consumeLook } from './input.js';
+import { stepAgent, setCrouch, wishDir } from './physics.js';
+import { buildNav } from './nav.js';
+import { createRenderer, buildDebugOverlay } from './render.js';
+import { buildLighting } from './art/lighting.js';
+import { buildWorld } from './art/geo.js';
+import { createHud } from './hud.js';
 
-// Minimal test contract (AGENTS.md): set ready after the first frame so
-// tools can wait for a settled render before screenshotting.
-window.__saltline = { ready: false };
+const params = new URLSearchParams(location.search);
+const SEED = Number(params.get('seed') ?? 1337);
+const AUTOPLAY = params.get('autoplay') === '1';
+const SPEED = clamp(Number(params.get('speed') ?? 1), 1, 16);
+const DEBUG = params.get('debug') === '1';
+const CAM = params.get('cam');
+const SCENARIO = params.get('scenario');
+const NO_POST = params.get('post') === '0'; // debug only: bypass the post chain
+
+window.__saltline = {
+  ready: false, round: 1, phase: 'live', score: { strand: 0, bastion: 0 },
+  roundsPlayed: 0, matchOver: false, lastWinReason: null, scenarioReady: false,
+  stats: { drawCalls: 0, triangles: 0, frameMs: 0 },
+};
+
+const boxes = buildBoxes();
+const state = createState(SEED, MAP);
+state.rng = mulberry32(SEED);
+state.boxes = boxes;
+const nav = buildNav(MAP, boxes);
+state.links = nav.links;
 
 const holder = document.getElementById('game');
-const renderer = new THREE.WebGLRenderer({ antialias: true, powerPreference: 'high-performance' });
-renderer.setPixelRatio(Math.min(window.devicePixelRatio, 1.5));
-renderer.setSize(window.innerWidth, window.innerHeight);
-renderer.outputColorSpace = THREE.SRGBColorSpace;
-renderer.toneMapping = THREE.ACESFilmicToneMapping;
-renderer.toneMappingExposure = 1.0;
-renderer.shadowMap.enabled = true;
-renderer.shadowMap.type = THREE.PCFShadowMap;
-holder.appendChild(renderer.domElement);
+const R = createRenderer(holder);
+R.noPost = NO_POST;
+const lights = buildLighting(R.renderer, R.scene, MAP);
+const hud = createHud();
+const { lockPointer } = createInput(R.renderer.domElement, state.input);
 
-const scene = new THREE.Scene();
-scene.background = new THREE.Color(0x2b2140);
-scene.fog = new THREE.Fog(0x2b2140, 18, 60);
+// --- world meshes: one merged bevelled mesh per material (art/geo.js) ---
+buildWorld(R.scene, boxes);
 
-const camera = new THREE.PerspectiveCamera(50, window.innerWidth / window.innerHeight, 0.1, 200);
-camera.position.set(4.2, 2.6, 6.4);
-camera.lookAt(0, 0.9, 0);
+const debugGroup = buildDebugOverlay(R.scene, nav, boxes);
+debugGroup.visible = DEBUG;
 
-// Sun: low warm dusk light from the west, long shadows across the yard.
-const sun = new THREE.DirectionalLight(0xffd2a1, 3.2);
-sun.position.set(-9, 6, 4);
-sun.castShadow = true;
-sun.shadow.mapSize.set(2048, 2048);
-sun.shadow.camera.left = -8;
-sun.shadow.camera.right = 8;
-sun.shadow.camera.top = 8;
-sun.shadow.camera.bottom = -8;
-sun.shadow.camera.near = 1;
-sun.shadow.camera.far = 30;
-sun.shadow.bias = -0.0003;
-sun.shadow.normalBias = 0.03;
-sun.shadow.radius = 2; // ART.md §3: PCFShadowMap with radius 2–3, no acne
-scene.add(sun);
+// --- camera / lookdev modes ---
+const player = state.player;
+let camMode = null;
+if (CAM) {
+  const [x, y, z, yaw, pitch] = CAM.split(',').map(Number);
+  camMode = { x, y, z, yaw: yaw * Math.PI / 180, pitch: pitch * Math.PI / 180 };
+  player.pos.set(x, 0, z); player.prevPos.copy(player.pos);
+  player.yaw = camMode.yaw; player.pitch = camMode.pitch;
+  document.getElementById('hud').style.display = params.get('hud') === '1' ? '' : 'none';
+}
 
-// Sky fill so shadows read blue-grey, never black.
-scene.add(new THREE.HemisphereLight(0x8aa6d1, 0xa4886a, 0.35));
+// --- autoplay driver (M1): walk forward, steer off walls, look around ---
+const _wd = new THREE.Vector3();
+let autoYaw = 0, autoTimer = 0;
+function autoplayTick(dt) {
+  autoTimer -= dt;
+  if (autoTimer <= 0) { autoTimer = 2 + state.rng() * 3; autoYaw = (state.rng() - 0.5) * 1.6; }
+  player.yaw += autoYaw * dt * 0.25;
+  state.input.f = true; state.input.walk = false; state.input.crouch = false;
+}
 
-// Salt ground: bleached, rough, receives the long shadow.
-const ground = new THREE.Mesh(
-  new THREE.PlaneGeometry(60, 60),
-  new THREE.MeshStandardMaterial({ color: 0xcfc6b4, roughness: 0.95, metalness: 0 }),
-);
-ground.rotation.x = -Math.PI / 2;
-ground.receiveShadow = true;
-scene.add(ground);
+// --- main loop ---
+let acc = 0, last = performance.now(), firstFrame = true;
+let frameCount = 0;
 
-// The box: salt-white, slightly warm, catches the sun on its top face.
-const box = new THREE.Mesh(
-  new THREE.BoxGeometry(1.6, 1.6, 1.6),
-  new THREE.MeshStandardMaterial({ color: 0xe8e2d6, roughness: 0.8, metalness: 0 }),
-);
-box.position.y = 0.8;
-box.castShadow = true;
-box.receiveShadow = true;
-scene.add(box);
+function tickOnce(dt) {
+  const p = player;
+  const look = consumeLook(state.input);
+  if (state.input.locked || AUTOPLAY) {
+    p.yaw -= look.dx;
+    p.pitch = clamp(p.pitch - look.dy, -1.55, 1.55);
+  }
+  if (AUTOPLAY) autoplayTick(dt);
+  setCrouch(state, p, state.input.crouch, dt);
+  const n = wishDir(p.yaw, state.input.f, state.input.b, state.input.l, state.input.r, _wd);
+  let speed = MOVE.defaultSpeed;
+  if (state.input.walk) speed *= MOVE.walkMul;
+  if (p.crouch > 0.5) speed *= MOVE.crouchMul;
+  if (n) stepAgent(state, p, _wd.x, _wd.z, speed, state.input.jump, dt);
+  else stepAgent(state, p, 0, 0, 0, state.input.jump, dt);
+  state.input.reload = false;
+  state.tick++; state.time += dt;
+}
 
-window.addEventListener('resize', () => {
-  camera.aspect = window.innerWidth / window.innerHeight;
-  camera.updateProjectionMatrix();
-  renderer.setSize(window.innerWidth, window.innerHeight);
-});
-
-const clock = new THREE.Clock();
-let firstFrame = true;
-function tick() {
-  requestAnimationFrame(tick);
-  const dt = Math.min(clock.getDelta(), 0.1);
-  box.rotation.y += dt * 0.6;
-  box.rotation.x += dt * 0.15;
-  renderer.render(scene, camera);
-  if (firstFrame) {
-    firstFrame = false;
-    window.__saltline.ready = true;
+function frame(now) {
+  requestAnimationFrame(frame);
+  const frameMs = now - last;
+  last = now;
+  const dt = Math.min(frameMs / 1000, 0.1);
+  if (!camMode) {
+    acc += dt;
+    let n = 0;
+    while (acc >= TICK && n < MAX_TICKS_PER_FRAME) { tickOnce(TICK); acc -= TICK; n++; }
+    if (n === MAX_TICKS_PER_FRAME) acc = 0;
+    if (AUTOPLAY) { for (let i = 0; i < SPEED - 1; i++) tickOnce(TICK); }
+  } else if (frameCount < 4) {
+    // Lookdev cam: settle a few ticks, then freeze the frame.
+    tickOnce(TICK); tickOnce(TICK);
+  }
+  const alpha = camMode ? 1 : clamp(acc / TICK, 0, 1);
+  R.placeCamera(player, alpha);
+  const t0 = performance.now();
+  R.renderFrame(state.time);
+  const info = R.renderer.info;
+  window.__saltline.stats.drawCalls = info.render.calls;
+  window.__saltline.stats.triangles = info.render.triangles;
+  window.__saltline.stats.frameMs = performance.now() - t0;
+  hud.update(state);
+  hud.setCrosshairGap(6);
+  if (firstFrame) { firstFrame = false; window.__saltline.ready = true; }
+  frameCount++;
+  if ((camMode || SCENARIO) && frameCount >= 6 && !window.__saltline.scenarioReady) {
+    window.__saltline.scenarioReady = true;
   }
 }
-tick();
+requestAnimationFrame(frame);

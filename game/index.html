@@ -1,51 +1,75 @@
 <!doctype html>
 <!--
-Reviewer's map (M0: pipeline only — the game itself lands in M1–M7):
+Reviewer's map (M1: move in the map — the game itself lands in M1–M7):
 - three.js 0.187.0 via the single import map below — game/three.module.min.js
-- Lit rotating box, sun + hemisphere light — js/main.js tick()
+- Fixed-step loop at 64 Hz with render interpolation — js/main.js tickOnce()
+- Player movement: friction, accel, jump, crouch, capsule vs AABB collision — js/physics.js stepAgent()
+- Brinehold blockout from box data (110x80 m, Pans/Boiler sites) — js/map.js MAP
+- Waypoint graph with auto-linking and A* — js/nav.js buildNav()
+- HDR target, bloom, ACES final pass — js/art/post.js createPost()
+- Sun with fitted shadow map, hemisphere fill, PMREM environment — js/art/lighting.js buildLighting()
+- Bevelled boxes with world-space UVs and baked AO — js/art/geo.js bevelBox()
+- HUD fields with dirty-checking — js/hud.js createHud()
 -->
 <html lang="en">
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>SALTLINE — Brinehold (M0 pipeline)</title>
+<title>SALTLINE — Brinehold (M1)</title>
 <style>
   :root {
-    --ink: #e8e2d6;
-    --muted: #9a938a;
-    --accent: #f0a03c;
+    --ink: #e8e2d6; --muted: #9a938a; --accent: #f0a03c; --teal: #2f8f86;
     --panel: rgba(20, 22, 28, 0.72);
   }
   * { box-sizing: border-box; }
   html, body {
-    margin: 0;
-    height: 100%;
-    overflow: hidden;
-    background: #2b2140;
-    color: var(--ink);
+    margin: 0; height: 100%; overflow: hidden; background: #2b2140; color: var(--ink);
     font-family: ui-monospace, Consolas, monospace;
   }
   #game, #game canvas { position: fixed; inset: 0; display: block; }
-  #caption {
-    position: fixed;
-    left: 16px;
-    bottom: 14px;
-    padding: 8px 12px;
-    background: var(--panel);
-    border-left: 3px solid var(--accent);
-    font-size: 12px;
-    line-height: 1.5;
-    letter-spacing: 0.04em;
-    pointer-events: none;
+  #hud { position: fixed; inset: 0; pointer-events: none; font-variant-numeric: tabular-nums; }
+  .panel {
+    position: absolute; background: var(--panel); padding: 6px 10px;
+    clip-path: polygon(0 0, calc(100% - 10px) 0, 100% 10px, 100% 100%, 10px 100%, 0 calc(100% - 10px));
   }
-  #caption b { color: var(--accent); font-weight: 600; }
-  #caption span { color: var(--muted); }
+  #hud-topleft { left: 14px; top: 12px; font-size: 13px; line-height: 1.5; }
+  #hud-topleft b { color: var(--accent); }
+  #hud-topleft .score { font-size: 18px; letter-spacing: 0.08em; }
+  #hud-bottomleft { left: 14px; bottom: 14px; min-width: 170px; }
+  #hud-bottomleft .hp { font-size: 26px; line-height: 1; }
+  #hud-bottomleft .bar { height: 5px; background: #3a3f46; margin-top: 5px; }
+  #hud-bottomleft .bar i { display: block; height: 100%; background: var(--accent); width: 100%; }
+  #hud-bottomright { right: 14px; bottom: 14px; text-align: right; font-size: 13px; line-height: 1.5; }
+  #hud-bottomright .ammo { font-size: 22px; }
+  #hud-hint {
+    position: absolute; left: 50%; top: 58%; transform: translateX(-50%);
+    font-size: 14px; letter-spacing: 0.14em; color: var(--ink);
+    text-shadow: 0 1px 4px #000;
+  }
+  #hud-cross {
+    position: absolute; left: 50%; top: 50%; width: 0; height: 0; --gap: 6px;
+  }
+  #hud-cross::before, #hud-cross::after,
+  #hud-cross i, #hud-cross b {
+    content: ""; position: absolute; background: var(--ink);
+    box-shadow: 0 0 2px #000;
+  }
+  #hud-cross::before { left: calc(-1px - var(--gap) - 5px); top: -1px; width: 5px; height: 2px; }
+  #hud-cross::after { left: calc(1px + var(--gap)); top: -1px; width: 5px; height: 2px; }
+  #hud-cross i { left: -1px; top: calc(-1px - var(--gap) - 5px); width: 2px; height: 5px; }
+  #hud-cross b { left: -1px; top: calc(1px + var(--gap)); width: 2px; height: 5px; }
 </style>
 <script type="importmap">{ "imports": { "three": "./three.module.min.js" } }</script>
 </head>
 <body>
 <div id="game"></div>
-<div id="caption"><b>SALTLINE</b> — Brinehold <span>// M0 pipeline · three.js 0.187.0</span></div>
+<div id="hud">
+  <div class="panel" id="hud-topleft"><span id="hud-round">ROUND 1</span><br><span class="score"><b>STRAND</b> <span id="hud-score">0 — 0</span> <b style="color:var(--teal)">BASTION</b></span><br><span id="hud-timer">1:45</span></div>
+  <div class="panel" id="hud-bottomleft"><span class="hp" id="hud-hp">100</span> <span style="color:var(--muted)">HP</span><div class="bar"><i id="hud-hpbar"></i></div></div>
+  <div class="panel" id="hud-bottomright"><span class="ammo" id="hud-ammo">— / —</span><br><span style="color:var(--muted)">WREN</span></div>
+  <div id="hud-cross"><i></i><b></b></div>
+  <div id="hud-hint">CLICK TO DEPLOY</div>
+</div>
 <script type="module" src="./js/main.js"></script>
 </body>
 </html>
