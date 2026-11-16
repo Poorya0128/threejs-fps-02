@@ -5,6 +5,7 @@ const boxes = [], buildings = [], props = [], floors = [];
 const R = (x0, z0, x1, z1, y1, m, y0 = 0) => { boxes.push([x0, y0, z0, x1, y1, z1, m]); return boxes.length - 1; };
 const BLD = (x0, z0, x1, z1, h, m = 8) => buildings.push(R(x0, z0, x1, z1, h, m));
 const CRATE = (x, z, n = 1, s = 1.2) => { for (let i = 0; i < n; i++) R(x - s / 2, z - s / 2, x + s / 2, z + s / 2, s * (i + 1), 6, s * i); };
+const BARREL = (...xz) => { for (let k = 0; k < xz.length; k += 2) { R(xz[k] - 0.31, xz[k + 1] - 0.31, xz[k] + 0.31, xz[k + 1] + 0.31, 0.9, 13); props.push(['barrel', xz[k], xz[k + 1]]); } };
 const CONT = (x, z, alongZ, m, y0 = 0) => alongZ ? R(x - 1.22, z - 3.05, x + 1.22, z + 3.05, y0 + 2.6, m, y0) : R(x - 3.05, z - 1.22, x + 3.05, z + 1.22, y0 + 2.6, m, y0);
 // wall(alongX, from, to, c0, c1, h, mat, gaps): a wall with openings [g0, g1, yLo, yHi] (door yLo = 0, window yLo > 0).
 function wall(ax, a0, a1, c0, c1, h, m, gaps = []) {
@@ -44,7 +45,11 @@ wall(1, -6, 24, -17, -16, 3.6, 0, [[1, 7, 0, 3.6]]);
 wall(0, -38, -16, 23, 24, 3.6, 0, [[-25, -19, 0, 3.6]]);
 for (const [x0, x1] of [[-3, 3], [4, 10], [11, 17]]) for (const [z0, z1] of [[-36, -30], [-29, -23]]) {
   R(x0, z0, x1, z0 + 0.3, 0.32, 1); R(x0, z1 - 0.3, x1, z1, 0.32, 1); R(x0, z0, x0 + 0.3, z1, 0.32, 1); R(x1 - 0.3, z0, x1, z1, 0.32, 1);
-  floors.push([x0 + 0.3, z0 + 0.3, x1 - 0.3, z1 - 0.3, 3]);
+  // Barrels (cover, with colliders) and a sandbag line in the courtyard.
+BARREL(-45, -26, -44.2, -26.6, 22.5, -36.6, 3.4, 34.6, 4.2, 34.8, 47.6, -2, 22.8, -10.6, 23.2, -9.8, 22.4, -9.6, -44.6, 11, -45.3, 11.2,
+  -5, -37, 24.8, 17.2, 24.9, 18, 16.6, 11.2);
+R(10, 7, 13.6, 7.7, 1.1, 13);
+floors.push([x0 + 0.3, z0 + 0.3, x1 - 0.3, z1 - 0.3, 3]);
 }
 R(13, -36, 19.5, -30, 3.25, 2, 3.0);
 for (const [x, z] of [[13.2, -35.8], [19.3, -35.8], [13.2, -30.2], [19.3, -30.2]]) R(x - 0.15, z - 0.15, x + 0.15, z + 0.15, 3.0, 2);
@@ -102,8 +107,7 @@ props.push(
   ['sign', 'PANS', -8, 3.6, -20.05, 0, 3], ['sign', 'BOILER', 10, 4.6, 16, 0, 3.6], ['sign', 'CONVEYOR', -34.05, 3.4, -14, 1, 3.4],
   ['sign', 'CULVERT', -34.05, 3.4, 22, 1, 3], ['sign', 'PUMPHOUSE', -17.95, 3.9, 1.5, 1, 3.4], ['sign', 'BRINEHOLD SALTWORKS', -20, 6, -12, 2, 9],
   ['sign', 'BASTION', 30, 4.4, -26, 2, 3.4],
-  ['barrel', -45, -26], ['barrel', -44.2, -26.6], ['barrel', 22.5, -36.6], ['barrel', 3.4, 34.6], ['barrel', 4.2, 34.8], ['barrel', 47.6, -2],
-  ['bags', 8, -19.6, 12, -18.9, 1.1], ['zone', 8, -26, 'A'], ['zone', 13, 22, 'B'],
+  ['bags', 8, -19.6, 12, -18.9, 1.1], ['bags', 10, 7, 13.6, 7.7, 1.1], ['shaft', 2.4, 4, 6, 18.5, 21.5], ['shaft', 2.4, 4, 6, 30.5, 33.5], ['zone', 8, -26, 'A'], ['zone', 13, 22, 'B'],
 );
 
 

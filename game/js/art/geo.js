@@ -2,11 +2,16 @@
 // vertices carry aE = 1 (edge wear); facades get plinths, cornices, pilasters and windows; props come from level data;
 // everything is merged per material and gets per-vertex ambient occlusion baked against the map boxes.
 import { Mesh, MeshStandardMaterial, CylinderGeometry, LatheGeometry, SphereGeometry, PlaneGeometry,
-	BoxGeometry, CanvasTexture, Vector2, Vector3, Matrix4, Quaternion, PointLight, SRGBColorSpace, DoubleSide } from 'three';
+	BoxGeometry, CanvasTexture, Vector2, Vector3, Matrix4, Quaternion, PointLight, SRGBColorSpace, DoubleSide,
+	ShaderMaterial, AdditiveBlending, BufferGeometry, Float32BufferAttribute } from 'three';
+import { sunDirection } from './lighting.js';
 import { worldMaterials, groundMaterials, procMaterial } from './materials.js';
 import { rayAABB, mulberry32 } from '../math.js';
 import { Bld, boxInto, ticks } from './mesh.js';
 
+const shaftMat = new ShaderMaterial({ transparent: true, depthWrite: false, blending: AdditiveBlending, side: DoubleSide,
+	vertexShader: 'varying float v;void main(){v=uv.y;gl_Position=projectionMatrix*modelViewMatrix*vec4(position,1.);}',
+	fragmentShader: 'varying float v;void main(){gl_FragColor=vec4(vec3(1.,.72,.42)*.4*pow(1.-v,1.4),1.);}' });
 // Ambient occlusion per vertex: 10 hemisphere rays of 1.6 m against nearby map boxes (spatial hash of 4 m cells).
 const AO_DIRS = Array.from({ length: 10 }, (_, k) => { const a = k * 2.399, e = 0.25 + 0.6 * ((k * 0.618) % 1); return [Math.cos(a) * Math.cos(e), Math.sin(e), Math.sin(a) * Math.cos(e)]; });
 function bakeAO(B, hash) {
@@ -147,7 +152,17 @@ export function buildWorld(scene, boxes, map) {
 		wlamp(x, y, z) {
 			tube(get(W[2]), A.set(x, y, z), Bv.set(x, y + 0.8, z), 0.015, 6);
 			get(W[2]).add(new SphereGeometry(0.28, 16, 6, 0, 6.3, 0, 1.3), at(x, y - 0.05, z)); get(bulb).add(new SphereGeometry(0.1, 10, 8), at(x, y - 0.12, z));
-			const l = new PointLight(0xffb062, 26, 16, 1.8); l.position.set(x, y - 0.4, z); scene.add(l);
+			const l = new PointLight(0xffb062, 40, 18, 1.8); l.position.set(x, y - 0.4, z); scene.add(l);
+		},
+		// Dusty sun shaft through a window opening (x, y0..y1, z0..z1): the four long faces of the prism swept along the
+		// sunlight down to the floor, additive and fading with distance.
+		shaft(x, y0, y1, z0, z1) {
+			const d = sunDirection(), p = [], uv = [], c = [[y0, z0], [y1, z0], [y1, z1], [y0, z1]];
+			for (let k = 0; k < 4; k++) for (const [y, z, v] of [[...c[k], 0], [...c[(k + 1) % 4], 0], [...c[(k + 1) % 4], 1], [...c[k], 0], [...c[(k + 1) % 4], 1], [...c[k], 1]]) {
+				const t = v * y / d.y; p.push(x - d.x * t, y - d.y * t, z - d.z * t); uv.push(0, v);
+			}
+			const g = new BufferGeometry(); g.setAttribute('position', new Float32BufferAttribute(p, 3)); g.setAttribute('uv', new Float32BufferAttribute(uv, 2));
+			scene.add(new Mesh(g, shaftMat));
 		},
 		pipe(...pts) {
 			for (let k = 0; k + 5 < pts.length; k += 3) {

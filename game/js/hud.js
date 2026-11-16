@@ -11,7 +11,7 @@ const PX = 2.6;
 export function createHud(map) {
 	const E = {};
 	for (const id of ['hp', 'hpbar', 'ar', 'arm', 'helm', 'money', 'ammo', 'wname', 'nS', 'nV', 'nG', 'kit', 'timer', 'rnd', 'scS', 'scB', 'pipS', 'pipB',
-		'feed', 'cross', 'hit', 'hurt', 'banner', 'bT', 'bS', 'prompt', 'prog', 'progL', 'progB', 'spec', 'buy', 'board', 'scope', 'flash', 'loc', 'radar']) E[id] = $(id);
+		'feed', 'cross', 'hit', 'hurt', 'banner', 'bT', 'bS', 'prompt', 'prog', 'progL', 'progB', 'spec', 'buy', 'board', 'scope', 'flash', 'loc', 'radar', 'vig']) E[id] = $(id);
 	const last = {};
 	const text = (k, v) => { if (last[k] !== v) { last[k] = v; E[k].textContent = v; } };
 	const html = (k, v) => { if (last[k] !== v) { last[k] = v; E[k].innerHTML = v; } };
@@ -129,6 +129,7 @@ export function createHud(map) {
 			cls('hit', 'on', hitOn); cls('hit', 'hs', v.lastHit.head);
 			const hurt = Math.max(0, 1 - (state.time - v.hurtT) / 0.8);
 			style('hurt', 'opacity', (hurt * 0.9).toFixed(2)); style('hurt', 'transform', `rotate(${((v.yaw - v.hurtYaw) * 57.3 + 20).toFixed(0)}deg)`);
+			style('vig', 'opacity', Math.min(1, hurt * 0.8 + (v.alive && v.hp <= 30 ? 0.55 : 0)).toFixed(2)); cls('vig', 'low', v.alive && v.hp <= 30);
 			style('flash', 'opacity', Math.min(1, v.flashT / 1.6).toFixed(2));
 		},
 	};

@@ -3,12 +3,12 @@
 // Vertex colour = finish, aE = 1 polymer / 2 metal for the shared material (pattern 12). The slide and the
 // magazine are separate meshes so the viewmodel can animate them.
 import { Shape, Path, ExtrudeGeometry, LatheGeometry, Vector2, Matrix4, Mesh, Group, Object3D, Color, MeshBasicMaterial, AdditiveBlending,
-	PlaneGeometry, CanvasTexture } from 'three';
+	PlaneGeometry, CircleGeometry, CanvasTexture, MeshStandardMaterial, DoubleSide } from 'three';
 import { Bld, boxInto } from './mesh.js';
 import { procMaterial } from './materials.js';
 
 const lin = (hex) => { const c = new Color(hex); return [c.r, c.g, c.b]; };
-const FIN = { M: lin(0x8a8e93), P: lin(0x45464a), S: lin(0xc4c7ca), W: lin(0x8a6040), B: lin(0xc9a050), R: lin(0x5a5d61) };
+const FIN = { K: lin(0x1b1c1f), M: lin(0x8a8e93), P: lin(0x45464a), S: lin(0xc4c7ca), W: lin(0x8a6040), B: lin(0xc9a050), R: lin(0x5a5d61) };
 export const weaponMaterial = procMaterial({ c: 0xffffff, pat: 12, bump: 0.004, env: 1.2, metal: 1 });
 const _m = new Matrix4();
 
@@ -30,19 +30,19 @@ const slots = (u0, u1, v0, v1, n) => { const out = [], w = (u1 - u0) / n; for (l
 
 function optic(B, kind, z, y) {
 	if (kind === 'scope') {
-		lat(B, FIN.M, 0, y + 0.045, z + 0.14, [0, 0, 0.024, 0, 0.024, 0.07, 0.015, 0.1, 0.015, 0.2, 0.021, 0.24, 0.021, 0.3, 0.019, 0.31, 0, 0.31], 2, 24);
-		for (const zz of [z + 0.07, z - 0.08]) box(B, FIN.M, -0.012, y, zz, 0.012, y + 0.03, zz - 0.02);
-		lat(B, FIN.M, 0.02, y + 0.045, z - 0.01, [0, 0, 0.009, 0, 0.009, 0.02, 0, 0.02], 2, 12);
+		lat(B, FIN.K, 0, y + 0.045, z + 0.14, [0, 0, 0.028, 0, 0.028, 0.07, 0.019, 0.1, 0.019, 0.2, 0.025, 0.24, 0.025, 0.3, 0.023, 0.31, 0, 0.31], 1, 24);
+		for (const zz of [z + 0.07, z - 0.08]) box(B, FIN.K, -0.012, y, zz, 0.012, y + 0.03, zz - 0.02, 1);
+		lat(B, FIN.K, 0.024, y + 0.045, z - 0.01, [0, 0, 0.009, 0, 0.009, 0.02, 0, 0.02], 1, 12);
 		return y + 0.045;
 	}
 	if (kind === 'holo') {
-		box(B, FIN.P, -0.017, y, z, 0.017, y + 0.012, z - 0.09, 1);
-		box(B, FIN.M, -0.019, y + 0.012, z, -0.015, y + 0.055, z - 0.09); box(B, FIN.M, 0.015, y + 0.012, z, 0.019, y + 0.055, z - 0.09);
-		box(B, FIN.M, -0.019, y + 0.051, z, 0.019, y + 0.056, z - 0.09);
+		box(B, FIN.K, -0.017, y, z, 0.017, y + 0.012, z - 0.09, 1);
+		box(B, FIN.K, -0.019, y + 0.012, z, -0.015, y + 0.055, z - 0.09, 1); box(B, FIN.K, 0.015, y + 0.012, z, 0.019, y + 0.055, z - 0.09, 1);
+		box(B, FIN.K, -0.019, y + 0.051, z, 0.019, y + 0.056, z - 0.09, 1);
 		return y + 0.033;
 	}
-	box(B, FIN.M, -0.013, y, z, 0.013, y + 0.01, z - 0.05);
-	lat(B, FIN.M, 0, y + 0.03, z, [0.02, 0, 0.02, 0.05, 0.017, 0.052], 2, 20);
+	box(B, FIN.K, -0.013, y, z, 0.013, y + 0.01, z - 0.05, 1);
+	lat(B, FIN.K, 0, y + 0.03, z, [0.023, 0, 0.023, 0.05, 0.02, 0.052], 1, 20);
 	return y + 0.03;
 }
 
@@ -97,7 +97,7 @@ function longGun(o) {
 	const sight = o.optic ? optic(B, o.optic, o.opticZ ?? -0.06, 0.075) : 0.075;
 	if (!o.optic) { box(B, FIN.M, -0.008, 0.07, z0 - 0.01, 0.008, 0.086, z0 - 0.025); box(B, FIN.M, -0.002, 0.07, -h1 + 0.03, 0.002, 0.09, -h1 + 0.035); }
 	if (o.bolt) { box(K, FIN.S, 0.017, 0.035, -0.02, 0.05, 0.042, -0.028); lat(K, FIN.S, 0.055, 0.038, -0.018, [0.008, 0, 0.008, 0.012, 0, 0.012], 2, 10); }
-	return { B, K, A, muz: [0, by, bz - o.barrel - 0.05], left: [0, -0.005, -(h0 + 0.09)], sight, optic: o.optic };
+	return { B, K, A, muz: [0, by, bz - o.barrel - 0.05], left: [0, -0.005, -(h0 + 0.09)], hg: o.pump ? [-0.01, 0.026, 0.026] : [(hy0 + 0.064) / 2, 0.023, (0.066 - hy0) / 2], sight, optic: o.optic, oz: o.opticZ ?? -0.06 };
 }
 
 function knife() {
@@ -124,8 +124,9 @@ const reticle = (() => {
 	const x = c.getContext('2d'), g = x.createRadialGradient(32, 32, 0, 32, 32, 8);
 	g.addColorStop(0, 'rgba(255,90,60,1)'); g.addColorStop(0.4, 'rgba(255,60,40,0.9)'); g.addColorStop(1, 'rgba(255,40,20,0)');
 	x.fillStyle = g; x.fillRect(0, 0, 64, 64);
-	return new MeshBasicMaterial({ map: new CanvasTexture(c), transparent: true, blending: AdditiveBlending, depthWrite: false, color: 0xffffff });
+	return new MeshBasicMaterial({ map: new CanvasTexture(c), transparent: true, blending: AdditiveBlending, depthWrite: false, color: new Color(4, 1.4, 1.2) });
 })();
+const lens = new MeshStandardMaterial({ color: 0x241f3c, metalness: 0.5, roughness: 0.05, transparent: true, opacity: 0.6, envMapIntensity: 2.5, side: DoubleSide });
 
 // lod = true: one merged mesh (third person). Otherwise slide and magazine stay separate and optics get a reticle.
 export function buildWeapon(id, lod = false) {
@@ -134,9 +135,11 @@ export function buildWeapon(id, lod = false) {
 	const mk = (P) => { if (!P || !P.p.length) return null; const m = new Mesh(P.geo(), weaponMaterial); m.castShadow = lod; g.add(m); return m; };
 	mk(s.B);
 	const slide = mk(s.K), mag = mk(s.A);
-	if (!lod && s.optic && s.optic !== 'scope') {
-		const r = new Mesh(new PlaneGeometry(0.03, 0.03), reticle); r.position.set(0, s.sight, (s.optic === 'holo' ? -0.12 : -0.06) - 0.04); r.renderOrder = 2; g.add(r);
+	if (!lod && s.optic) { // tinted glass at both ends of the optic and an HDR red dot that reads on sky and walls
+		const sc = s.optic === 'scope', z0 = s.oz + (sc ? 0.139 : -0.001), z1 = z0 - (sc ? 0.308 : s.optic === 'holo' ? 0.088 : 0.048), R = sc ? 0.024 : 0.02;
+		for (const z of [z0, z1]) { const l = new Mesh(new CircleGeometry(R, 20), lens); l.position.set(0, s.sight, z); g.add(l); }
+		if (s.optic !== 'scope') { const r = new Mesh(new PlaneGeometry(0.03, 0.03), reticle); r.position.set(0, s.sight, (z0 + z1) / 2); r.renderOrder = 2; g.add(r); }
 	}
 	const muzzle = new Object3D(); muzzle.position.fromArray(s.muz); g.add(muzzle);
-	return { group: g, muzzle, slide, mag, left: s.left, sight: s.sight };
+	return { group: g, muzzle, slide, mag, left: s.left, hg: s.hg, sight: s.sight };
 }

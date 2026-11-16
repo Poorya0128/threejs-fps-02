@@ -46,8 +46,7 @@ void surface(out vec3 c,out float r,out float h,out float mt){
 	c*=(.88+.24*h3(vec3(floor(b),4.)))*(1.-.35*m);h=h*.4-m*.7;}
 	else if (P==11){float k=smoothstep(.66,.74,fbm(vW*.7)+.2*f);c=mix(c*(.92+.1*n),uC2*(.94+.06*f),k);
 	r=mix(.05,.75,k);h=k*(.4+f*.4);}
-	else if (P==12){if (vE>1.5){r=.38+.2*n;mt=1.;}else if (vE>.5){r=.62+.2*f;mt=0.;h=f*.4;}
-	else{float w=sin(q.x*380.)*sin(q.y*380.);h=w*.12+n*.3;r=.88;mt=0.;}}
+	else if (P==12){if (vE>2.5){r=.45;mt=0.;}else if (vE>1.5){r=.38+.2*n;mt=1.;}else if (vE>.5){r=.62+.2*f;mt=0.;h=f*.4;}else{float w=sin(q.x*380.)*sin(q.y*380.);h=w*.12+n*.3;r=.88;mt=0.;}}
 	if (P<12){
 	float side=1.-an.y,y=vW.y;
 	float d=(1.-smoothstep(0.,1.5,y))*smoothstep(.3,.7,fbm(vW*.8+5.))*uL.y*side;
@@ -86,9 +85,15 @@ export function procMaterial(o) {
 			.replace('#include <map_fragment>', '#include <map_fragment>\nvec3 pc; float pr, ph, pm; surface(pc, pr, ph, pm); diffuseColor.rgb = pc;')
 			.replace('#include <roughnessmap_fragment>', 'float roughnessFactor = pr;')
 			.replace('#include <metalnessmap_fragment>', 'float metalnessFactor = metalness * pm;')
-			.replace('#include <normal_fragment_maps>', `#include <normal_fragment_maps>\n${BUMP}`);
+			.replace('#include <normal_fragment_maps>', `#include <normal_fragment_maps>\n${BUMP}`)
+			// Characters (pattern 12, uL = bump, rim, accent glow, hit flash): fresnel rim + emissive team accents so
+			// soldiers never fall to a black silhouette in shade, and a short red-white flash when hit.
+			.replace('#include <emissivemap_fragment>', `#include <emissivemap_fragment>
+				if (int(uPat + .5) == 12) totalEmissiveRadiance += pc * step(2.5, vE) * uL.z + vec3(1., .4, .3) * uL.w
+					+ vec3(1., .92, .82) * pow(1. - abs(dot(normal, normalize(vViewPosition))), 3.) * uL.y * (.35 + .65 * pc);`);
 	};
 	m.customProgramCacheKey = () => 'saltline-proc';
+	m.userData.u = u;
 	return m;
 }
 

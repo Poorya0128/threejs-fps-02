@@ -82,8 +82,8 @@ export const HIT = { head: 4,headHelm: 2.4,chest: 1,stomach: 1,arm: 0.9,leg: 0.7
 export const ARMOR_RATIO = 0.5;
 
 export const TEAM_LOOK = {
-	strand: { cloth: 0x8f8263, gear: 0x6a6046, accent: 0xf0a03c, helmet: 0x9a8b66 },
-	bastion: { cloth: 0x4d5866, gear: 0x2e353e, accent: 0x2f8f86, helmet: 0x3a424c },
+	strand: { cloth: 0xc2b28c, gear: 0x8f7f5a, accent: 0xf0a03c, helmet: 0xb7a67c },
+	bastion: { cloth: 0x8796a6, gear: 0x55616e, accent: 0x34c2b2, helmet: 0x6d7a88 },
 };
 
 
