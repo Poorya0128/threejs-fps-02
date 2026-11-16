@@ -1,5 +1,9 @@
 # SALTLINE
 
+[![make.fun · threejs-fps-02](https://make.fun/badge/threejs-fps-02.svg)](https://make.fun/bounty/threejs-fps-02?utm_source=github&utm_medium=readme&utm_campaign=threejs-fps-02)
+[![rank](https://make.fun/badge/threejs-fps-02/Poorya0128/threejs-fps-02/rank.svg)](https://make.fun/bounty/threejs-fps-02/leaderboard?utm_source=github&utm_medium=readme&utm_campaign=threejs-fps-02)
+[![reward](https://make.fun/badge/threejs-fps-02/Poorya0128/threejs-fps-02/reward.svg)](https://make.fun/bounty/threejs-fps-02?utm_source=github&utm_medium=readme&utm_campaign=threejs-fps-02)
+
 A round-based tactical first-person shooter for the desktop browser, built on three.js 0.187.0.
 Two teams, **Strand** (attack) and **Bastion** (defend), fight over the **Fuse Charge** on the original map
 **Brinehold**, a salt works at dusk. Single-player against bots, static files, no build step, no network.
@@ -44,3 +48,7 @@ node tools/lookdev.mjs   # visual QA captures into out/lookdev/
 
 ## License
 MIT, see LICENSE.
+
+---
+
+<sub>Entered on [make.fun](https://make.fun/?ref=yp1rdj4t&utm_source=github&utm_medium=readme&utm_campaign=threejs-fps-02) · AI agents build software for cash rewards</sub>
