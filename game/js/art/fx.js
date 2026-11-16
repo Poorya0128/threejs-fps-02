@@ -1,169 +1,116 @@
-// SALTLINE art/fx.js — pooled effects (ART.md §10). Drains state.fxEvents
-import * as THREE from 'three';
+// SALTLINE art/fx.js — pooled effects (ART.md §10). Drains state.fxEvents (0 tracer, 1 muzzle, 2 bullet hole, 3 impact,
+// 4 casing, 6 body hit, 7 explosion / flash) and draws grenades, Veil clouds and the Fuse from state. Nothing is
+// allocated after createFx(): every effect cycles through a fixed pool.
+import { Mesh, Sprite, SpriteMaterial, MeshBasicMaterial, MeshStandardMaterial, BoxGeometry, PlaneGeometry, CylinderGeometry, CanvasTexture,
+	AdditiveBlending, NormalBlending, Points, PointsMaterial, BufferGeometry, BufferAttribute, PointLight, Vector3, Color, SRGBColorSpace } from 'three';
+import { mulberry32 } from '../math.js';
 
-const _a = new THREE.Vector3(), _b = new THREE.Vector3(), _c = new THREE.Vector3();
+const _a = new Vector3(), METAL = new Set([2, 3, 4, 9, 10, 11]), hot = (r, g, b) => new Color(r, g, b);
+function tex(size, draw) {
+	const c = document.createElement('canvas'); c.width = c.height = size;
+	draw(c.getContext('2d'), size, mulberry32(size));
+	const t = new CanvasTexture(c); t.colorSpace = SRGBColorSpace; return t;
+}
+const puff = (x, s, r) => { for (let k = 0; k < 28; k++) { const px = s / 2 + (r() - 0.5) * s * 0.45, py = s / 2 + (r() - 0.5) * s * 0.45, g = x.createRadialGradient(px, py, 0, px, py, s * (0.12 + r() * 0.22)); g.addColorStop(0, `rgba(255,255,255,${0.22 + r() * 0.2})`); g.addColorStop(1, 'rgba(255,255,255,0)'); x.fillStyle = g; x.fillRect(0, 0, s, s); } };
+const hole = (metal) => (x, s, r) => {
+	const c = s / 2, g = x.createRadialGradient(c, c, 0, c, c, s * 0.16);
+	if (metal) { x.fillStyle = 'rgba(190,190,185,.9)'; x.beginPath(); x.arc(c, c, s * 0.2, 0, 7); x.fill(); }
+	else for (let k = 0; k < 14; k++) { const a = r() * 7, d = s * (0.1 + r() * 0.16); x.fillStyle = `rgba(150,140,125,${0.5 + r() * 0.4})`; x.beginPath(); x.arc(c + Math.cos(a) * d, c + Math.sin(a) * d, s * (0.04 + r() * 0.07), 0, 7); x.fill(); }
+	g.addColorStop(0, 'rgba(8,7,6,1)'); g.addColorStop(0.7, 'rgba(25,22,20,.95)'); g.addColorStop(1, 'rgba(40,35,30,0)'); x.fillStyle = g; x.beginPath(); x.arc(c, c, s * 0.16, 0, 7); x.fill();
+};
 
 export function createFx(scene) {
-  const tracerMat = new THREE.MeshBasicMaterial({ color: 0xffe9b0, transparent: true, opacity: 0, blending: THREE.AdditiveBlending, depthWrite: false });
-  const tracers = [];
-  for (let i = 0; i < 12; i++) {
-    const m = new THREE.Mesh(new THREE.BoxGeometry(0.025, 0.025, 1), tracerMat.clone());
-    m.visible = false; scene.add(m);
-    tracers.push({ m, t: 0 });
-  }
-  let trIdx = 0;
-  const decalGeo = new THREE.CircleGeometry(0.09, 10);
-  const decals = [];
-  for (let i = 0; i < 24; i++) {
-    const m = new THREE.Mesh(decalGeo, new THREE.MeshBasicMaterial({ color: 0x141210, transparent: true, opacity: 0.6, depthWrite: false, polygonOffset: true, polygonOffsetFactor: -2 }));
-    m.visible = false; scene.add(m);
-    decals.push(m);
-  }
-  let decIdx = 0;
-  const SN = 96;
-  const sPos = new Float32Array(SN * 3), sVel = new Float32Array(SN * 3), sLife = new Float32Array(SN);
-  const sGeo = new THREE.BufferGeometry();
-  sGeo.setAttribute('position', new THREE.BufferAttribute(sPos, 3));
-  const sparks = new THREE.Points(sGeo, new THREE.PointsMaterial({ color: 0xffd9a0, size: 0.05, transparent: true, opacity: 0.95, blending: THREE.AdditiveBlending, depthWrite: false }));
-  sparks.frustumCulled = false; scene.add(sparks);
-  let spIdx = 0;
-  const shells = [];
-  const shellGeo = new THREE.BoxGeometry(0.012, 0.006, 0.022);
-  const shellMat = new THREE.MeshStandardMaterial({ color: 0xb08d3f, metalness: 1, roughness: 0.35 });
-  for (let i = 0; i < 24; i++) {
-    const m = new THREE.Mesh(shellGeo, shellMat);
-    m.visible = false; scene.add(m);
-    shells.push({ m, vx: 0, vy: 0, vz: 0, t: 0 });
-  }
-  let shIdx = 0;
-  const flashLight = new THREE.PointLight(0xffc27a, 0, 16, 1.8);
-  scene.add(flashLight);
-  let flashT = 0, flashDur = 0.06, flashMax = 22;
-  const smokeTex = (() => {
-    const c = document.createElement('canvas'); c.width = c.height = 64;
-    const x = c.getContext('2d');
-    const g = x.createRadialGradient(32, 32, 4, 32, 32, 32);
-    for (const [o, a] of [[0, 0.85], [0.55, 0.4], [1, 0]]) g.addColorStop(o, `rgba(255,255,255,${a})`);
-    x.fillStyle = g; x.fillRect(0, 0, 64, 64);
-    return new THREE.CanvasTexture(c);
-  })();
-  const smokePuffs = [];
-  for (let i = 0; i < 4; i++) {
-    const group = [];
-    for (let j = 0; j < 9; j++) {
-      const m = new THREE.Sprite(new THREE.SpriteMaterial({ map: smokeTex, color: 0x9aa0a3, transparent: true, opacity: 0, depthWrite: false }));
-      m.visible = false; scene.add(m);
-      group.push(m);
-    }
-    smokePuffs.push(group);
-  }
-  const nadeGeo = new THREE.SphereGeometry(0.07, 8, 6);
-  const nadeMat = new THREE.MeshStandardMaterial({ color: 0x2a2e22, roughness: 0.6, metalness: 0.4 });
-  const nadeMeshes = [];
-  for (let i = 0; i < 8; i++) {
-    const m = new THREE.Mesh(nadeGeo, nadeMat);
-    m.visible = false; scene.add(m);
-    nadeMeshes.push(m);
-  }
-  function spawnTracer(x, y, z, ex, ey, ez) {
-    const tr = tracers[trIdx]; trIdx = (trIdx + 1) % tracers.length;
-    _a.set(x, y, z); _b.set(ex, ey, ez);
-    const len = _a.distanceTo(_b);
-    tr.m.position.copy(_a).lerp(_b, 0.5);
-    tr.m.lookAt(_b);
-    tr.m.scale.set(1, 1, len);
-    tr.m.material.opacity = 0.9; tr.m.visible = true; tr.t = 0.12;
-  }
-  function spawnDecal(x, y, z, nx, ny, nz) {
-    const m = decals[decIdx]; decIdx = (decIdx + 1) % decals.length;
-    m.position.set(x + nx * 0.012, y + ny * 0.012, z + nz * 0.012);
-    m.lookAt(x + nx, y + ny, z + nz);
-    m.visible = true;
-  }
-  function spawnSparks(x, y, z) {
-    const n = 8;
-    for (let i = 0; i < n; i++) {
-      const k = spIdx; spIdx = (spIdx + 1) % SN;
-      sPos[k * 3] = x; sPos[k * 3 + 1] = y; sPos[k * 3 + 2] = z;
-      sVel[k * 3] = (Math.random() - 0.5) * 3;
-      sVel[k * 3 + 1] = Math.random() * 2.5;
-      sVel[k * 3 + 2] = (Math.random() - 0.5) * 3;
-      sLife[k] = 0.45;
-    }
-  }
-  function spawnShell(x, y, z, rx, rz) {
-    const s = shells[shIdx]; shIdx = (shIdx + 1) % shells.length;
-    s.m.position.set(x + rx * 0.1, y - 0.05, z + rz * 0.1);
-    s.vx = rx * 1.4 + (Math.random() - 0.5); s.vy = 1.4 + Math.random(); s.vz = rz * 1.4 + (Math.random() - 0.5);
-    s.t = 4; s.m.visible = true;
-  }
-
-  return {
-    update(state, viewmodel, dt, chars) {
-      const ev = state.fxEvents;
-      while (state.fxHead !== state.fxTail) {
-        const e = ev[state.fxHead];
-        state.fxHead = (state.fxHead + 1) % 32;
-        if (e.kind === 0) spawnTracer(e.x, e.y, e.z, e.dx, e.dy, e.dz);
-        else if (e.kind === 1) { viewmodel.flash(); flashLight.position.set(e.x, e.y, e.z); flashLight.intensity = 22; flashT = 0.06; flashDur = 0.06; flashMax = 22; }
-        else if (e.kind === 2) spawnDecal(e.x, e.y, e.z, e.dx, e.dy, e.dz);
-        else if (e.kind === 3) spawnSparks(e.x, e.y, e.z);
-        else if (e.kind === 4) spawnShell(e.x, e.y, e.z, e.dx, e.dz);
-        else if (e.kind === 6 && chars) chars.flash(e.mat);
-        else if (e.kind === 7) {
-          for (let k = 0; k < 3; k++) spawnSparks(e.x, e.y, e.z);
-          flashLight.position.set(e.x, e.y, e.z); flashLight.intensity = 80; flashT = 0.3; flashDur = 0.3; flashMax = 80;
-        }
-      }
-      if (flashT > 0) { flashT -= dt; flashLight.intensity = flashMax * Math.max(0, flashT / flashDur); }
-      else flashLight.intensity = 0;
-      for (let i = 0; i < 4; i++) {
-        const s = state.smokes[i], group = smokePuffs[i];
-        const age = state.time - s.t;
-        const grow = s.active ? Math.min(1, age / 1.2) : 0;
-        const fade = s.active ? Math.max(0, Math.min(1, (s.dur - age) / 3)) : 0;
-        for (let j = 0; j < 9; j++) {
-          const m = group[j];
-          if (!s.active) { m.visible = false; continue; }
-          const v = (k) => ((j * k) % 10) / 10;
-          const a = j * 2.399, rr = s.r * (0.15 + 0.38 * v(37));
-          m.position.set(s.x + Math.cos(a) * rr, s.y + 0.3 + v(53) * s.r * 0.55 + age * 0.12, s.z + Math.sin(a) * rr);
-          const sc = s.r * (0.5 + 0.22 * v(29)) * (0.6 + 0.4 * grow);
-          m.scale.set(sc, sc, 1);
-          m.material.opacity = 0.42 * grow * fade;
-          m.visible = true;
-        }
-      }
-      for (let i = 0; i < 8; i++) {
-        const g = state.nades[i], m = nadeMeshes[i];
-        if (!g.active) { m.visible = false; continue; }
-        m.position.set(g.x, g.y, g.z);
-        m.visible = true;
-      }
-      for (const tr of tracers) {
-        if (tr.t <= 0) continue;
-        tr.t -= dt;
-        tr.m.material.opacity = Math.max(0, tr.t / (0.12)) * 0.9;
-        if (tr.t <= 0) tr.m.visible = false;
-      }
-      for (let i = 0; i < SN; i++) {
-        if (sLife[i] <= 0) { sPos[i * 3 + 1] = -100; continue; }
-        sLife[i] -= dt;
-        sVel[i * 3 + 1] -= 6 * dt;
-        sPos[i * 3] += sVel[i * 3] * dt;
-        sPos[i * 3 + 1] += sVel[i * 3 + 1] * dt;
-        sPos[i * 3 + 2] += sVel[i * 3 + 2] * dt;
-      }
-      sGeo.attributes.position.needsUpdate = true;
-      for (const s of shells) {
-        if (s.t <= 0) continue;
-        s.t -= dt;
-        s.vy -= 9.8 * dt;
-        s.m.position.x += s.vx * dt; s.m.position.y += s.vy * dt; s.m.position.z += s.vz * dt;
-        s.m.rotation.x += 9 * dt; s.m.rotation.z += 7 * dt;
-        if (s.m.position.y < 0.01) { s.m.position.y = 0.01; s.vy *= -0.35; s.vx *= 0.6; s.vz *= 0.6; }
-        if (s.t <= 0) s.m.visible = false;
-      }
-    },
-  };
+	const rng = mulberry32(99), smoke = tex(128, puff), add = (o) => { o.visible = false; scene.add(o); return o; };
+	const tracers = Array.from({ length: 16 }, () => ({ m: add(new Mesh(new BoxGeometry(0.008, 0.008, 2.2), new MeshBasicMaterial({ color: hot(4, 2.6, 1.2), transparent: true, blending: AdditiveBlending, depthWrite: false }))), a: new Vector3(), b: new Vector3(), t: 0, len: 0 }));
+	const holeMats = [false, true].map((m) => new MeshStandardMaterial({ map: tex(64, hole(m)), transparent: true, depthWrite: false, polygonOffset: true, polygonOffsetFactor: -4, roughness: 0.9 }));
+	const decals = Array.from({ length: 64 }, () => add(new Mesh(new PlaneGeometry(0.14, 0.14), holeMats[0])));
+	const SN = 160, sp = new Float32Array(SN * 3), sv = new Float32Array(SN * 3), sl = new Float32Array(SN), sGeo = new BufferGeometry();
+	sGeo.setAttribute('position', new BufferAttribute(sp, 3));
+	const sparks = new Points(sGeo, new PointsMaterial({ color: hot(8, 5, 2), size: 0.035, transparent: true, blending: AdditiveBlending, depthWrite: false }));
+	sparks.frustumCulled = false; scene.add(sparks);
+	const sprites = (n, color, blending = NormalBlending) => Array.from({ length: n }, () => ({ s: add(new Sprite(new SpriteMaterial({ map: smoke, color, transparent: true, depthWrite: false, opacity: 0, blending }))), t: 0, life: 1, v: new Vector3(), grow: 1, a: 0.5 }));
+	const dust = sprites(36, 0xcdc4b4), fire = sprites(6, hot(6, 3, 1.2), AdditiveBlending), clouds = sprites(64, 0xbdb8b0);
+	const shellGeo = new CylinderGeometry(0.0055, 0.0055, 0.026, 8), shellMat = new MeshStandardMaterial({ color: 0xb08d3f, metalness: 1, roughness: 0.3 });
+	const shells = Array.from({ length: 32 }, () => ({ m: add(new Mesh(shellGeo, shellMat)), v: new Vector3(), t: 0 }));
+	const nadeGeo = new CylinderGeometry(0.035, 0.035, 0.11, 10), nadeMat = new MeshStandardMaterial({ color: 0x3a4030, roughness: 0.6, metalness: 0.3 });
+	const nades = Array.from({ length: 8 }, () => add(new Mesh(nadeGeo, nadeMat)));
+	const light = new PointLight(0xffb060, 0, 14, 1.8), fuseLight = new PointLight(0xff9a30, 0, 7, 2);
+	const fuse = add(new Mesh(new BoxGeometry(0.34, 0.13, 0.24), new MeshStandardMaterial({ color: 0x2a2d30, roughness: 0.5, metalness: 0.6 })));
+	const led = new Mesh(new BoxGeometry(0.2, 0.02, 0.05), new MeshStandardMaterial({ color: 0, emissive: 0xffa040, emissiveIntensity: 8 }));
+	led.position.set(0, 0.075, -0.06); fuseLight.position.y = 0.4; fuse.add(led, fuseLight); scene.add(light);
+	let lightT = 0, lightDur = 1, lightMax = 0, ti = 0, di = 0, si = 0, ui = 0, hi = 0, fi = 0;
+	const emit = (pool, i, x, y, z, life, grow, a, vx, vy, vz) => {
+		const p = pool[i % pool.length]; p.s.position.set(x, y, z); p.v.set(vx, vy, vz); Object.assign(p, { t: 0, life, grow, a }); p.s.visible = true; p.s.material.rotation = rng() * 6.3;
+		return i + 1;
+	};
+	const spark = (x, y, z, n, v, up, life) => { for (let k = 0; k < n; k++) { const j = si++ % SN; sp[j * 3] = x; sp[j * 3 + 1] = y; sp[j * 3 + 2] = z; sv[j * 3] = (rng() - 0.5) * v; sv[j * 3 + 1] = rng() * up; sv[j * 3 + 2] = (rng() - 0.5) * v; sl[j] = life * (0.5 + rng()); } };
+	const flash = (x, y, z, peak, dur) => { light.position.set(x, y, z); lightMax = peak; lightDur = lightT = dur; };
+	function event(e, vm, chars, eye) {
+		const near = _a.set(e.x, e.y, e.z).distanceTo(eye) < 1.2;
+		if (e.kind === 0) { const tr = tracers[ti++ % 16]; tr.a.set(e.x, e.y, e.z); tr.b.set(e.dx, e.dy, e.dz); tr.len = tr.a.distanceTo(tr.b); tr.t = near ? 4 / 320 : 0; tr.m.visible = tr.len > 5; }
+		else if (e.kind === 1) { if (near) vm.flash(); else fi = emit(fire, fi, e.x, e.y, e.z, 0.05, 0.25, 0.9, 0, 0, 0); flash(e.x, e.y, e.z, 18, 0.05); }
+		else if (e.kind === 2) {
+			const m = decals[di++ % 64]; m.material = holeMats[METAL.has(e.mat) ? 1 : 0];
+			m.position.set(e.x + e.dx * 0.005, e.y + e.dy * 0.005, e.z + e.dz * 0.005); m.lookAt(e.x + e.dx, e.y + e.dy, e.z + e.dz); m.rotateZ(rng() * 6.3); m.scale.setScalar(0.7 + rng() * 0.6); m.visible = true;
+		} else if (e.kind === 3) { if (METAL.has(e.mat)) spark(e.x, e.y, e.z, 10, 5, 3.5, 0.3); for (let k = 0; k < 2; k++) ui = emit(dust, ui, e.x, e.y, e.z, 0.7 + rng() * 0.5, 0.9, 0.55, (rng() - 0.5) * 0.6, 0.35, (rng() - 0.5) * 0.6); }
+		else if (e.kind === 4) { const s = shells[hi++ % 32]; s.m.position.set(e.x, e.y - 0.04, e.z); s.v.set(e.dx * 2 + rng() - 0.5, 1.6 + rng(), e.dz * 2 + rng() - 0.5); s.t = 3; s.m.visible = true; }
+		else if (e.kind === 6) chars.flash(e.mat);
+		else if (e.kind === 7) {
+			flash(e.x, e.y + 1, e.z, e.mat ? 300 : 120, e.mat ? 0.12 : 0.35);
+			if (e.mat) return;
+			for (let k = 0; k < 3; k++) fi = emit(fire, fi, e.x + (rng() - 0.5) * 0.6, e.y + 0.3 + rng() * 0.4, e.z + (rng() - 0.5) * 0.6, 0.35, 4, 1, 0, 1, 0);
+			for (let k = 0; k < 10; k++) ui = emit(dust, ui, e.x, e.y + 0.4, e.z, 2.2 + rng(), 6, 0.7, (rng() - 0.5) * 4, 1 + rng() * 2, (rng() - 0.5) * 4);
+			spark(e.x, e.y + 0.2, e.z, 40, 14, 9, 0.7);
+		}
+	}
+	function stepSprites(pool, dt) {
+		for (const p of pool) {
+			if (!p.s.visible) continue;
+			const k = (p.t += dt) / p.life;
+			if (k >= 1) { p.s.visible = false; continue; }
+			p.s.position.addScaledVector(p.v, dt); p.v.x *= 0.96; p.v.z *= 0.96;
+			p.s.scale.setScalar(0.25 + p.grow * Math.sqrt(k)); p.s.material.opacity = p.a * (1 - k) * Math.min(1, k * 12);
+		}
+	}
+	return {
+		update(state, vm, dt, chars, eye) {
+			while (state.fxHead !== state.fxTail) { event(state.fxEvents[state.fxHead], vm, chars, eye); state.fxHead = (state.fxHead + 1) % state.fxEvents.length; }
+			lightT = Math.max(0, lightT - dt); light.intensity = lightMax * lightT / lightDur;
+			for (const tr of tracers) if (tr.m.visible) { // a 2.2 m streak flying at 320 m/s from the muzzle to the hit point
+				const d = (tr.t += dt) * 320;
+				if (d > tr.len + 1.2) tr.m.visible = false;
+				else { tr.m.position.lerpVectors(tr.a, tr.b, Math.min(1, d / tr.len)); tr.m.lookAt(tr.b); }
+			}
+			for (let j = 0; j < SN; j++) {
+				if (sl[j] <= 0) { sp[j * 3 + 1] = -99; continue; }
+				sl[j] -= dt; sv[j * 3 + 1] -= 9.8 * dt;
+				for (let k = 0; k < 3; k++) sp[j * 3 + k] += sv[j * 3 + k] * dt;
+			}
+			sGeo.attributes.position.needsUpdate = true;
+			stepSprites(dust, dt); stepSprites(fire, dt);
+			for (const s of shells) if (s.m.visible) {
+				s.v.y -= 9.8 * dt; s.m.position.addScaledVector(s.v, dt); s.m.rotation.x += 14 * dt; s.m.rotation.z += 9 * dt;
+				if (s.m.position.y < 0.006) { s.m.position.y = 0.006; s.v.multiplyScalar(0.5); s.v.y *= -0.6; }
+				if ((s.t -= dt) <= 0) s.m.visible = false;
+			}
+			// Veil: 16 soft puffs per cloud that billow out to the gameplay radius, drift up and fade over the last 2.5 s.
+			for (let i = 0; i < 64; i++) {
+				const sm = state.smokes[i >> 4], j = i & 15, c = clouds[i].s, age = state.time - sm.t;
+				const k = Math.min(1, age / 1.4), fade = Math.min(1, (sm.dur - age) / 2.5);
+				c.visible = sm.active && fade > 0;
+				if (!c.visible) continue;
+				const a = j * 2.399 + age * 0.05, rr = sm.r * (0.2 + 0.55 * ((j * 7) % 16) / 16) * (0.5 + 0.5 * k);
+				c.position.set(sm.x + Math.cos(a) * rr, sm.y - 0.3 + ((j * 5) % 16) / 16 * sm.r * 0.9 * k + age * 0.04, sm.z + Math.sin(a) * rr);
+				c.scale.setScalar(sm.r * (0.9 + 0.5 * ((j * 3) % 16) / 16) * (0.35 + 0.65 * k));
+				c.material.rotation = j + age * 0.03 * (j % 2 ? 1 : -1); c.material.opacity = 0.75 * fade * Math.min(1, k * 2);
+			}
+			for (let i = 0; i < 8; i++) { const g = state.nades[i]; nades[i].visible = g.active; if (g.active) { nades[i].position.set(g.x, g.y, g.z); nades[i].rotation.x += dt * 8; } }
+			const F = state.fuse; // planted Fuse: LED and light blink faster as the timer runs out
+			fuse.visible = F.planted || F.dropped;
+			if (fuse.visible) {
+				const blink = F.planted ? (Math.sin(state.time * (6 + 30 * (1 - state.roundT / 40))) > 0 ? 1 : 0.15) : 0.3;
+				fuse.position.set(F.x, 0.065, F.z); led.material.emissiveIntensity = 8 * blink; fuseLight.intensity = F.planted ? 6 * blink : 0;
+			}
+		},
+	};
 }

@@ -1,154 +1,138 @@
-// SALTLINE art/characters.js — bot rigs (ART.md §7). 1.80 m / 7.5 heads,
-import * as THREE from 'three';
+// SALTLINE art/characters.js — soldiers (ART.md §7): rigid gear parts skinned to a 14-bone rig, one SkinnedMesh
+// (one draw) per soldier. Team identity by silhouette and colour; walk/crouch/aim/death are procedural and both
+// hands reach the held weapon through analytic two-bone IK.
+import { Bone, Skeleton, SkinnedMesh, Group, Mesh, MeshStandardMaterial, Float32BufferAttribute, Uint16BufferAttribute, CapsuleGeometry,
+	SphereGeometry, CylinderGeometry, Matrix4, Vector3, Quaternion, Euler, Color } from 'three';
+import { Bld, boxInto } from './geo.js';
+import { buildWeapon, weaponMaterial } from './weapons-art.js';
+import { TEAM_LOOK } from '../config.js';
 
-const TEAM = {
-  strand: { cloth: 0x8a7a52, gear: 0x5c5238, accent: 0xf0a03c, head: 0x6b5a34 },
-  bastion: { cloth: 0x3a4450, gear: 0x232a33, accent: 0x2f8f86, head: 0x232a33 },
-};
+// Bone table: [parent, x, y, z] in bind pose (relative to parent). Arms hang down; forward is -z.
+const BONES = [[-1, 0, 0, 0], [0, 0, 0.95, 0], [1, 0, 0.27, 0], [2, 0, 0.33, 0], [2, -0.2, 0.22, 0], [4, 0, -0.29, 0], [2, 0.2, 0.22, 0], [6, 0, -0.29, 0],
+	[1, -0.1, -0.04, 0], [8, 0, -0.44, 0], [1, 0.1, -0.04, 0], [10, 0, -0.44, 0]];
+const [ROOT, PELVIS, CHEST, HEAD, LUA, LFA, RUA, RFA, LTH, LSH, RTH, RSH] = BONES.keys();
+const L1 = 0.29, L2 = 0.27, DOWN = new Vector3(0, -1, 0);
+const lin = (h) => { const c = new Color(h); return [c.r, c.g, c.b]; };
+const _m = new Matrix4(), _q = new Quaternion(), _q2 = new Quaternion(), _e = new Euler(), _v = new Vector3(), _s = new Vector3(1, 1, 1);
+const _S = new Vector3(), _T = new Vector3(), _E = new Vector3(), _D = new Vector3(), _P = new Vector3();
+
+function buildBody(team) {
+	const L = TEAM_LOOK[team], B = new Bld(), skin = [];
+	const cloth = lin(L.cloth), gear = lin(L.gear), acc = lin(L.accent), helm = lin(L.helmet), dark = lin(0x1c1c1e), face = lin(0x2b2825);
+	const part = (bone, fn) => { const n0 = B.p.length / 3; fn(); for (let k = n0; k < B.p.length / 3; k++) skin.push(bone); };
+	const bx = (mn, mx, col, e = 1, r = 0.02) => boxInto(B, mn, mx, r, col, 0.4, e, e);
+	const geo = (g, x, y, z, col, e = 0, sx = 1, sy = 1, sz = 1, rx = 0) => B.add(g, _m.compose(_v.set(x, y, z), _q.setFromEuler(_e.set(rx, 0, 0)), _s.set(sx, sy, sz)), e, col);
+	part(PELVIS, () => {
+		geo(new CapsuleGeometry(0.15, 0.1, 4, 14), 0, 0.93, 0, cloth, 0, 1.1, 1, 0.75);
+		bx([-0.18, 0.98, -0.12], [0.18, 1.04, 0.12], gear);
+		for (const x of [-0.17, 0.17]) bx([x - 0.03, 0.9, -0.06], [x + 0.03, 1.0, 0.04], gear);
+	});
+	part(CHEST, () => {
+		geo(new CapsuleGeometry(0.16, 0.22, 4, 16), 0, 1.3, 0, cloth, 0, 1.15, 1, 0.72);
+		bx([-0.16, 1.12, -0.17], [0.16, 1.45, -0.08], gear); bx([-0.16, 1.12, 0.07], [0.16, 1.45, 0.15], gear);
+		bx([-0.19, 1.12, -0.1], [0.19, 1.27, 0.09], gear);
+		for (const x of [-0.11, 0, 0.11]) bx([x - 0.04, 1.13, -0.215], [x + 0.04, 1.26, -0.165], gear, 1, 0.012);
+		for (const x of [-0.1, 0.1]) bx([x - 0.035, 1.44, -0.12], [x + 0.035, 1.5, 0.12], gear, 1, 0.01);
+		if (team === 'strand') bx([-0.15, 1.1, 0.15], [0.15, 1.44, 0.3], gear); else bx([-0.13, 1.3, 0.15], [0.13, 1.42, 0.2], dark);
+		geo(new CylinderGeometry(0.06, 0.07, 0.1, 12), 0, 1.53, 0, face);
+	});
+	part(HEAD, () => {
+		geo(new SphereGeometry(0.105, 18, 14), 0, 1.66, -0.01, face, 0, 0.95, 1.08, 1.05);
+		geo(new SphereGeometry(0.135, 22, 10, 0, 6.3, 0, team === 'strand' ? 1.45 : 1.75), 0, 1.65, 0.0, helm, 1, 1, 1.05, 1.12);
+		geo(new CylinderGeometry(0.03, 0.03, 0.035, 12), -0.12, 1.65, 0.01, dark, 1, 1, 1, 1, 0);
+		geo(new CylinderGeometry(0.03, 0.03, 0.035, 12), 0.12, 1.65, 0.01, dark, 1);
+		bx([-0.025, 1.76, -0.15], [0.025, 1.8, -0.11], dark, 2, 0.008);
+		if (team === 'strand') { bx([-0.085, 1.66, -0.125], [0.085, 1.7, -0.09], dark, 2, 0.012); bx([-0.125, 1.67, -0.1], [0.125, 1.69, 0.1], acc, 1, 0.005); }
+		else geo(new CylinderGeometry(0.128, 0.128, 0.075, 20, 1, true, Math.PI * 0.62, Math.PI * 0.76), 0, 1.655, -0.005, dark, 2);
+	});
+	for (const [ua, fa, s] of [[LUA, LFA, -1], [RUA, RFA, 1]]) {
+		part(ua, () => { geo(new CapsuleGeometry(0.052, 0.19, 4, 12), s * 0.2, 1.31, 0, cloth); bx([s * 0.2 - 0.056, 1.33, -0.035], [s * 0.2 + 0.056, 1.39, 0.035], acc, 1, 0.01); });
+		part(fa, () => { geo(new CapsuleGeometry(0.046, 0.17, 4, 12), s * 0.2, 1.03, 0, cloth); bx([s * 0.2 - 0.04, 0.84, -0.045], [s * 0.2 + 0.04, 0.94, 0.04], lin(0x3b3428), 1, 0.02); });
+	}
+	for (const [th, sh, s] of [[LTH, LSH, -1], [RTH, RSH, 1]]) {
+		part(th, () => { geo(new CapsuleGeometry(0.075, 0.28, 4, 14), s * 0.1, 0.69, 0, cloth); if (s > 0) bx([0.14, 0.62, -0.06], [0.19, 0.78, 0.06], gear); });
+		part(sh, () => {
+			geo(new CapsuleGeometry(0.058, 0.28, 4, 12), s * 0.1, 0.27, 0, cloth);
+			bx([s * 0.1 - 0.06, 0.4, -0.1], [s * 0.1 + 0.06, 0.52, -0.04], gear);
+			bx([s * 0.1 - 0.06, 0.0, -0.17], [s * 0.1 + 0.06, 0.14, 0.07], dark, 1, 0.03);
+		});
+	}
+	const g = B.geo(), idx = new Uint16Array(skin.length * 4), w = new Float32Array(skin.length * 4);
+	skin.forEach((b, k) => { idx[k * 4] = b; w[k * 4] = 1; });
+	g.setAttribute('skinIndex', new Uint16BufferAttribute(idx, 4)); g.setAttribute('skinWeight', new Float32BufferAttribute(w, 4));
+	return g;
+}
+
+// Two-bone IK in the chest frame: rotates upper arm and forearm so the wrist reaches target T (pole bends the elbow).
+function reach(ua, fa, S, T, side) {
+	_D.subVectors(T, S); const d = Math.min(_D.length(), L1 + L2 - 0.002); _D.normalize();
+	const a = (L1 * L1 - L2 * L2 + d * d) / (2 * d), h = Math.sqrt(Math.max(0, L1 * L1 - a * a));
+	_P.set(side * 0.7, -1, 0.35); _P.addScaledVector(_D, -_P.dot(_D)).normalize();
+	_E.copy(S).addScaledVector(_D, a).addScaledVector(_P, h);
+	ua.quaternion.setFromUnitVectors(DOWN, _v.subVectors(_E, S).normalize());
+	_q2.setFromUnitVectors(DOWN, _v.subVectors(T, _E).normalize());
+	fa.quaternion.copy(ua.quaternion).invert().multiply(_q2);
+}
 
 export function createCharacters(scene) {
-  const torsoGeo = new THREE.CapsuleGeometry(0.21, 0.42, 4, 12);
-  const headGeo = new THREE.SphereGeometry(0.115, 12, 10);
-  const helmGeo = new THREE.SphereGeometry(0.14, 12, 8, 0, Math.PI * 2, 0, Math.PI * 0.55);
-  const limbGeo = new THREE.CapsuleGeometry(0.075, 0.36, 4, 10);
-  const armGeo = new THREE.CapsuleGeometry(0.055, 0.3, 4, 10);
-  const bootGeo = new THREE.BoxGeometry(0.11, 0.09, 0.28);
-  const vestGeo = new THREE.BoxGeometry(0.36, 0.42, 0.1);
-  const packGeo = new THREE.BoxGeometry(0.3, 0.38, 0.12);
-  const stripGeo = new THREE.BoxGeometry(0.32, 0.03, 0.02);
-  const gunGeo = new THREE.BoxGeometry(0.05, 0.1, 0.55);
-  const barrelGeo = new THREE.CylinderGeometry(0.018, 0.018, 0.28, 8);
-  const patchGeo = new THREE.BoxGeometry(0.14, 0.07, 0.02);
-  const visorGeo = new THREE.BoxGeometry(0.2, 0.06, 0.04);
-  const padGeo = new THREE.BoxGeometry(0.13, 0.1, 0.04);
-  const stripMat = new THREE.MeshStandardMaterial({ color: 0xf0a03c, emissive: 0xf0a03c, emissiveIntensity: 1.6 });
-  const rubber = new THREE.MeshStandardMaterial({ color: 0x1d1d1f, roughness: 0.9 });
-  const metal = new THREE.MeshStandardMaterial({ color: 0x30343a, roughness: 0.45, metalness: 0.85 });
-  const skin = new THREE.MeshStandardMaterial({ color: 0xc8a882, roughness: 0.7 });
-  const visorMat = new THREE.MeshStandardMaterial({ color: 0x0e1216, roughness: 0.25, metalness: 0.6 });
-  const mats = {};
-  for (const t of ['strand', 'bastion']) {
-    const c = TEAM[t];
-    mats[t] = {
-      cloth: new THREE.MeshStandardMaterial({ color: c.cloth, roughness: 0.85 }),
-      gear: new THREE.MeshStandardMaterial({ color: c.gear, roughness: 0.6, metalness: 0.2 }),
-      accent: new THREE.MeshStandardMaterial({ color: c.accent, roughness: 0.5, emissive: c.accent, emissiveIntensity: 0.45 }),
-      head: new THREE.MeshStandardMaterial({ color: c.head, roughness: 0.85 }),
-    };
-  }
-
-  const rigs = new Map();
-
-  function part(parent, geo, mat, x, y, z) {
-    const m = new THREE.Mesh(geo, mat);
-    m.position.set(x || 0, y || 0, z || 0);
-    parent.add(m);
-    return m;
-  }
-
-  function rigFor(a) {
-    const m = mats[a.team];
-    const root = new THREE.Group();
-    const pelvis = new THREE.Group();
-    pelvis.position.y = 0.95;
-    root.add(pelvis);
-    const torsoMat = m.cloth.clone();
-    const torso = part(pelvis, torsoGeo, torsoMat, 0, 0.28, 0); torso.castShadow = true;
-    const vest = part(pelvis, vestGeo, m.gear, 0, 0.3, -0.19); vest.castShadow = true;
-    const pack = part(pelvis, packGeo, m.gear, 0, 0.32, 0.22);
-    const strip = part(pelvis, stripGeo, stripMat, 0, 0.4, 0.29);
-    strip.visible = false;
-    const chest = new THREE.Group();
-    chest.position.y = 0.5;
-    pelvis.add(chest);
-    const head = new THREE.Group();
-    head.position.y = 0.28;
-    chest.add(head);
-    const skull = part(head, headGeo, skin); skull.castShadow = true;
-    const helm = part(head, helmGeo, m.head, 0, 0.03, 0);
-    const visor = part(head, visorGeo, visorMat, 0, 0.02, -0.11);
-    const patch = part(chest, patchGeo, m.accent, 0.16, 0.1, -0.05);
-    const arms = [];
-    for (const s of [-1, 1]) {
-      const sh = new THREE.Group();
-      sh.position.set(0.24 * s, 0.42, 0);
-      pelvis.add(sh);
-      const up = part(sh, armGeo, m.cloth, 0, -0.18, 0); up.castShadow = true;
-      const el = new THREE.Group();
-      el.position.y = -0.36;
-      sh.add(el);
-      const fo = part(el, armGeo, m.cloth, 0, -0.16, 0);
-      sh.rotation.x = -1.1; el.rotation.x = -0.7;
-      arms.push({ sh, el });
-    }
-    const legs = [];
-    for (const s of [-1, 1]) {
-      const hip = new THREE.Group();
-      hip.position.set(0.11 * s, 0.92, 0);
-      root.add(hip);
-      const th = part(hip, limbGeo, m.cloth, 0, -0.22, 0); th.castShadow = true;
-      const knee = new THREE.Group();
-      knee.position.y = -0.46;
-      hip.add(knee);
-      const sh2 = part(knee, limbGeo, m.cloth, 0, -0.2, 0);
-      const boot = part(knee, bootGeo, rubber, 0, -0.44, -0.05);
-      const pad = part(knee, padGeo, rubber, 0, -0.05, -0.09);
-      legs.push({ hip, knee });
-    }
-    const gun = new THREE.Group();
-    gun.position.set(0.08, 0.32, -0.32);
-    chest.add(gun);
-    const recv = part(gun, gunGeo, metal);
-    const barrel = part(gun, barrelGeo, metal, 0, 0.02, -0.38);
-    barrel.rotation.x = Math.PI / 2;
-    scene.add(root);
-    const rig = { root, pelvis, chest, head, arms, legs, torsoMat, strip, fall: 0, flashT: 0 };
-    rigs.set(a.id, rig);
-    return rig;
-  }
-
-  return {
-    flash(id) {
-      const r = rigs.get(id);
-      if (r) r.flashT = 0.12;
-    },
-    update(state, dt) {
-      for (const a of state.agents) {
-        if (!a.isBot) continue;
-        let r = rigs.get(a.id);
-        if (!r) r = rigFor(a);
-        r.root.position.set(a.pos.x, a.pos.y, a.pos.z);
-        r.root.rotation.y = a.yaw;
-        r.strip.visible = a.hasFuse;
-        if (r.flashT > 0) {
-          r.flashT -= dt;
-          r.torsoMat.emissive.setHex(0xffffff);
-          r.torsoMat.emissiveIntensity = Math.max(0, r.flashT / 0.12) * 0.8;
-        } else r.torsoMat.emissiveIntensity = 0;
-        if (!a.alive) {
-          r.fall = Math.min(1, r.fall + dt * 3);
-          r.root.rotation.x = -Math.PI / 2 * r.fall;
-          r.root.position.y = a.pos.y + 0.25 * r.fall;
-          continue;
-        }
-        r.fall = 0;
-        r.root.rotation.x = 0;
-        const sp = a._speed || 0;
-        const amp = Math.min(1, sp / 5) * 0.55;
-        const ph = a._walkPhase || 0;
-        r.legs[0].hip.rotation.x = Math.sin(ph) * amp;
-        r.legs[1].hip.rotation.x = -Math.sin(ph) * amp;
-        r.legs[0].knee.rotation.x = Math.max(0, -Math.sin(ph)) * amp * 1.4;
-        r.legs[1].knee.rotation.x = Math.max(0, Math.sin(ph)) * amp * 1.4;
-        const c = a.crouch;
-        r.pelvis.position.y = 0.95 - c * 0.28;
-        r.legs[0].hip.rotation.x += c * 0.5;
-        r.legs[1].hip.rotation.x += c * 0.5;
-        r.legs[0].knee.rotation.x += c * 0.9;
-        r.legs[1].knee.rotation.x += c * 0.9;
-        r.chest.rotation.x = c * 0.25 + a.pitch * 0.7;
-        r.head.rotation.x = a.pitch * 0.3;
-      }
-    },
-  };
+	const geos = { strand: buildBody('strand'), bastion: buildBody('bastion') };
+	const fuseMat = new MeshStandardMaterial({ color: 0x000000, emissive: 0xf0a03c, emissiveIntensity: 6 });
+	const rigs = new Map(), weapons = {};
+	function rigFor(a) {
+		const bones = BONES.map(([, x, y, z]) => { const b = new Bone(); b.position.set(x, y, z); return b; });
+		BONES.forEach(([p], k) => { if (p >= 0) bones[p].add(bones[k]); });
+		const mesh = new SkinnedMesh(geos[a.team], weaponMaterial);
+		mesh.add(bones[ROOT]); mesh.updateMatrixWorld(true); mesh.bind(new Skeleton(bones));
+		mesh.castShadow = true; mesh.receiveShadow = true; mesh.frustumCulled = false;
+		const fuse = new Mesh(new CylinderGeometry(0.05, 0.05, 0.22, 10), fuseMat);
+		fuse.position.set(0, 0.0, 0.31); fuse.rotation.z = Math.PI / 2; bones[CHEST].add(fuse);
+		const hold = new Group(); bones[CHEST].add(hold);
+		scene.add(mesh);
+		const r = { mesh, bones, fuse, hold, team: a.team, wid: '', gun: null, fall: 0, flinch: 0, side: a.id % 2 ? 1 : -1 };
+		rigs.set(a.id, r);
+		return r;
+	}
+	function holdWeapon(r, id) {
+		if (r.wid === id) return;
+		if (r.gun) r.hold.remove(r.gun.group);
+		if (!weapons[id]) weapons[id] = buildWeapon(id, true);
+		r.gun = { group: weapons[id].group.clone(), left: weapons[id].left };
+		r.hold.add(r.gun.group); r.wid = id;
+		const pistol = !r.gun.left && id !== 'cutlass';
+		r.hold.position.set(pistol ? 0.03 : 0.1, pistol ? 0.17 : 0.13, pistol ? -0.42 : -0.16);
+	}
+	return {
+		flash(id) { const r = rigs.get(id); if (r) r.flinch = 1; },
+		update(state, dt) {
+			for (const a of state.agents) {
+				if (!a.isBot && !state.showPlayerBody) continue;
+				let r = rigs.get(a.id);
+				if (!r || r.team !== a.team) { if (r) scene.remove(r.mesh); r = rigFor(a); }
+				const b = r.bones;
+				holdWeapon(r, a.weapons[a.active] || 'wren');
+				r.mesh.position.copy(a.pos); r.mesh.rotation.y = a.yaw;
+				r.fuse.visible = a.hasFuse;
+				r.fall = a.alive ? 0 : Math.min(1, r.fall + dt * 2.6);
+				r.flinch = Math.max(0, r.flinch - dt * 6);
+				const f = r.fall * r.fall, sp = a.speed, amp = Math.min(1, sp / 5.5) * 0.62, ph = a.walkPhase, c = a.crouch * (1 - r.fall);
+				b[PELVIS].position.y = 0.95 - c * 0.3 - f * 0.72 + Math.abs(Math.sin(ph)) * amp * 0.035;
+				b[ROOT].rotation.set(-f * 1.45, 0, f * 0.25 * r.side);
+				b[PELVIS].rotation.y = Math.sin(ph) * amp * 0.12;
+				for (const [th, sh, s] of [[LTH, LSH, 1], [RTH, RSH, -1]]) {
+					const sw = Math.sin(ph) * amp * s;
+					b[th].rotation.x = sw + c * 1.1 + f * 0.3; b[sh].rotation.x = -Math.max(0, -Math.cos(ph) * s) * amp * 1.3 - c * 1.8 - f * 0.2;
+				}
+				b[CHEST].rotation.set(a.pitch * 0.65 + c * 0.2 - r.flinch * 0.25 - f * 0.4, -b[PELVIS].rotation.y, 0);
+				b[HEAD].rotation.x = a.pitch * 0.3 - f * 0.3;
+				if (r.fall > 0.3) { for (const [ua, fa, s] of [[LUA, LFA, -1], [RUA, RFA, 1]]) { b[ua].rotation.set(-0.4 * f, 0, s * 1.3 * f); b[fa].rotation.set(-0.5 * f, 0, 0); } r.hold.visible = false; continue; }
+				r.hold.visible = true;
+				r.hold.updateMatrix();
+				for (const [ua, fa, s, pt] of [[RUA, RFA, 1, [0, -0.065, 0.03]], [LUA, LFA, -1, r.gun.left || (r.wid === 'cutlass' ? null : [-0.02, -0.07, 0.02])]]) {
+					if (!pt) { b[ua].rotation.set(0.15, 0, -0.1); b[fa].rotation.set(-0.3, 0, 0); continue; }
+					_T.fromArray(pt); if (s < 0 && r.gun.left) _T.z += 0.1; _T.applyMatrix4(r.hold.matrix); _S.copy(b[ua].position);
+					reach(b[ua], b[fa], _S, _T, s);
+				}
+			}
+		},
+	};
 }

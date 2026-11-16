@@ -1,1 +1,12 @@
-[{"cam":[-38,1.62,26,0,0],"name":"yard-to-conveyor","note":"Strand Yard looking north down the Conveyor lane to Pans; long sightline, sun side-lit"},{"cam":[-28,1.62,10,0,-2],"name":"conveyor-to-pans","note":"down the Conveyor lane; belt left, low wall right, Pans ahead"},{"cam":[-2,1.62,-2,0,0],"name":"pumphouse-view","note":"Pumphouse looking north to the Pans approach; window frame in view"},{"cam":[-16,1.62,-20,0,0],"name":"pans-site","note":"into the Pans site; low salt walls, pump tower right"},{"cam":[24,1.62,34,0,0],"name":"boiler-hall","note":"inside the Boiler hall looking north to the doors; vessel left, catwalk right, sodium lights, plaster ceiling"},{"cam":[12,1.62,4,180,0],"name":"culvert","note":"inside the Culvert tunnel looking south; tight concrete, water channel"},{"cam":[28,1.62,-2,90,0],"name":"court-view","note":"Bastion Court looking west across mid; rotation route"},{"cam":[-20,1.3,-10,45,-4],"name":"corner-closeup","note":"close-up of a wall corner: bevel highlight, AO at the base, material read"}]
+[
+  { "name": "conveyor-east", "cam": [-38, 1.62, -23.5, -90, -2], "note": "Conveyor lane toward Pans, sun behind" },
+  { "name": "pans-from-west", "cam": [-4, 1.62, -23.5, -95, -4], "note": "Pans site from the Conveyor mouth" },
+  { "name": "pans-from-mid", "cam": [4, 1.62, -14, 10, -3], "note": "Pans from the courtyard door" },
+  { "name": "courtyard", "cam": [-3, 1.62, 0, -100, -2], "note": "Courtyard from the Pumphouse door" },
+  { "name": "pumphouse-in", "cam": [-17, 1.62, 1.5, -90, -4], "note": "Interior, short angles" },
+  { "name": "culvert", "cam": [-38, 1.62, 24, -90, -2], "note": "Culvert into the tunnel" },
+  { "name": "boiler-in", "cam": [4, 1.62, 26, -75, 2], "note": "Boiler hall from the west door" },
+  { "name": "yard", "cam": [-44, 1.62, 6, -120, -3], "note": "Strand Yard spawn" },
+  { "name": "court", "cam": [44, 1.62, 3, 110, -3], "note": "Bastion Court looking west, against the sun" },
+  { "name": "wall-corner", "cam": [-33, 1.3, -11, 135, -18], "note": "Material and AO close-up" }
+]
