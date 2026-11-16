@@ -1,11 +1,11 @@
 // Pooled effects (ART.md §10) from state.fxEvents, plus grenades, Veil clouds and the Fuse.
-import { Mesh, Sprite, SpriteMaterial, MeshBasicMaterial, MeshStandardMaterial, BoxGeometry, PlaneGeometry, CylinderGeometry, AdditiveBlending,
+import { Mesh, Line, LineBasicMaterial, Sprite, SpriteMaterial, MeshStandardMaterial, BoxGeometry, PlaneGeometry, CylinderGeometry, AdditiveBlending,
 	Points, PointsMaterial, BufferGeometry, BufferAttribute, PointLight, Vector3, Color } from 'three';
 import { mulberry32 } from '../math.js';
 import { canvasTex } from './mesh.js';
 import { ROUND } from '../config.js';
 
-const _a = new Vector3(), METAL = new Set([2, 3, 4, 9, 10, 11]), hot = (r, g, b) => new Color(r, g, b), glow = { transparent: true, blending: AdditiveBlending, depthWrite: false };
+const SPEED = 300, _a = new Vector3(), METAL = new Set([2, 3, 4, 9, 10, 11]), hot = (r, g, b) => new Color(r, g, b), glow = { transparent: true, blending: AdditiveBlending, depthWrite: false };
 const disc = (x, cx, cy, r, fill) => { x.fillStyle = fill; x.beginPath(); x.arc(cx, cy, r, 0, 7); x.fill(); };
 const puff = canvasTex(128, (x, s, r) => { for (let k = 0; k < 28; k++) {
 	const px = s / 2 + (r() - .5) * s * .45, py = s / 2 + (r() - .5) * s * .45, g = x.createRadialGradient(px, py, 0, px, py, s * (.12 + r() * .22));
@@ -19,7 +19,8 @@ const hole = canvasTex(64, (x, s, r) => { // dark core in chipped rim
 
 export function createFx(scene) {
 	const rng = mulberry32(99), add = (o) => { o.visible = false; scene.add(o); return o; }, pool = (n, f) => Array.from({ length: n }, f);
-	const tracers = pool(16, () => ({ m: add(new Mesh(new BoxGeometry(.005, .005, 1.8), new MeshBasicMaterial({ color: hot(4, 2.6, 1.2), ...glow }))), a: new Vector3(), b: new Vector3(), t: 0, len: 0 }));
+	const trail = new BufferGeometry().setFromPoints([new Vector3(), new Vector3(0, 0, -5)]), trailMat = new LineBasicMaterial({ color: hot(14, 9, 4), ...glow });
+	const tracers = pool(24, () => ({ m: add(new Line(trail, trailMat)), a: new Vector3(), b: new Vector3(), t: 0, len: 0 })); // lines never vanish below a pixel
 	const holeMat = new MeshStandardMaterial({ map: hole, transparent: true, depthWrite: false, polygonOffset: true, polygonOffsetFactor: -4, roughness: .9 });
 	const decals = pool(64, () => add(new Mesh(new PlaneGeometry(.14, .14), holeMat)));
 	const SN = 160, sp = new Float32Array(SN * 3), sv = new Float32Array(SN * 3), sl = new Float32Array(SN), sGeo = new BufferGeometry();
@@ -44,7 +45,7 @@ export function createFx(scene) {
 	const flash = (x, y, z, peak, dur) => { light.position.set(x, y, z); lightMax = peak; lightDur = lightT = dur; };
 	function event(e, vm, chars, eye) {
 		const near = _a.set(e.x, e.y, e.z).distanceTo(eye) < 1.2, metal = METAL.has(e.mat);
-		if (e.kind === 0) { const tr = tracers[ti++ % 16]; tr.a.set(e.x, e.y, e.z); tr.b.set(e.dx, e.dy, e.dz); tr.len = tr.a.distanceTo(tr.b); tr.t = near ? 4 / 520 : 0; tr.m.visible = tr.len > 5; }
+		if (e.kind === 0) { const tr = tracers[ti++ % 24]; tr.a.set(e.x, e.y, e.z); tr.b.set(e.dx, e.dy, e.dz); tr.len = tr.a.distanceTo(tr.b); tr.t = near ? 1.2 / SPEED : 0; tr.m.visible = tr.len > 5; }
 		else if (e.kind === 1) { if (near) vm.flash(); else fi = emit(fire, fi, e.x, e.y, e.z, .035, .3, 1, 0, 0, 0); flash(e.x, e.y, e.z, 26, .035); }
 		else if (e.kind === 2) {
 			const m = decals[di++ % 64];
@@ -75,8 +76,8 @@ export function createFx(scene) {
 			for (; state.fxHead !== state.fxTail; state.fxHead = (state.fxHead + 1) % state.fxEvents.length) event(state.fxEvents[state.fxHead], vm, chars, eye);
 			lightT = Math.max(0, lightT - dt); light.intensity = lightMax * lightT / lightDur;
 			for (const tr of tracers) if (tr.m.visible) {
-				const d = (tr.t += dt) * 520;
-				tr.m.visible = dt > 0 && d < tr.len + 1.2;
+				const d = (tr.t += dt) * SPEED;
+				tr.m.visible = dt > 0 && d < tr.len + 5;
 				tr.m.position.lerpVectors(tr.a, tr.b, Math.min(1, d / tr.len)); tr.m.lookAt(tr.b);
 			}
 			for (let j = 0; j < SN; j++) {

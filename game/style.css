@@ -71,7 +71,7 @@ html,body{margin:0;height:100%;overflow:hidden;background:#000;color:var(--ink);
 #prog .bar i{background:var(--amber)}
 #prompt{top:57%;font-size:12px;letter-spacing:.24em}
 #scope,#vig{inset:0}
-#scope{background:radial-gradient(circle,#ff3b2f 0 .32vh,transparent .45vh 31vh,#000 31.3vh)}
+#scope{background:radial-gradient(circle,#ff3b2f 0 .32vh,transparent .45vh 26vh,rgba(0,0,0,.55) 30.6vh,#000 31.3vh)}
 #scope:before,#scope:after{content:"";position:absolute;background:rgba(0,0,0,.85)}
 #scope:before{left:50%;top:19vh;bottom:19vh;width:1px}
 #scope:after{top:50%;left:calc(50% - 31vh);right:calc(50% - 31vh);height:1px}
@@ -85,7 +85,6 @@ html,body{margin:0;height:100%;overflow:hidden;background:#000;color:var(--ink);
 .cols{display:grid;grid-template-columns:1fr 1fr;gap:12px}
 .cols p{margin:0 0 6px}
 .it{display:grid;grid-template-columns:18px 1fr auto;gap:2px 8px;padding:7px 9px;margin-bottom:6px;background:rgba(255,255,255,.04);border-left:2px solid transparent;cursor:pointer}
-.it:hover{background:rgba(240,160,60,.12);border-color:var(--amber)}
 .it kbd{font:inherit}
 .it kbd,.it s{color:var(--amber);text-decoration:none}
 .it b{font-weight:600}

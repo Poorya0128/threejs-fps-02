@@ -189,6 +189,7 @@ Space cycles. This keeps rounds watchable and shows bot behaviour.
 |---|---|---|---|---|---|---|---|---|
 | 2 | **Wren** | pistol | free | 28 | yes | 380 semi | 15/45 | default |
 | 1 | **Hornet** | SMG | 1,250 | 24 | yes | 850 | 30/120 | good while moving, short range falloff |
+| 1 | **Breaker** | shotgun | 1,100 | 9 × 11 | yes | 70 pump | 6/30 | wide pellet cone, steep falloff |
 | 1 | **Talon** | rifle | 2,700 | 34 | yes | 600 | 30/90 | strong vertical-then-sideways pattern |
 | 1 | **Gavel** | rifle | 3,000 | 31 | yes | 660 | 25/75 | tighter pattern, lower damage |
 | 1 | **Longbow** | marksman | 4,500 | 112 | yes | 40 bolt | 5/20 | RMB scope 2 levels, unscoped is wildly inaccurate |
@@ -196,9 +197,11 @@ Space cycles. This keeps rounds watchable and shows bot behaviour.
 | 3 | **Veil** | smoke | 300 | – | – | – | 1 | 15 s cloud, **blocks bot vision** |
 | – | Plate vest | armor | 650 | | | | | 50 % damage absorption body |
 | – | Plate + helm | armor | 1,000 | | | | | helm cancels the head bonus partially |
+| – | **Cutters** | Bastion kit | 400 | | | | | defuse in 3.5 s instead of 7 s |
 
-M6 note: the Mako, Breaker, Cutlass knife, Glare flash and Cutters were cut so that the whole source fits the
-judge's 160 KiB text cap (see the M6 commits). Defusing takes 7 s and the Fuse burns 35 s.
+M6 note: the Mako, Cutlass knife and Glare flash were cut so that the whole source fits the judge's 160 KiB
+text cap (see the M6 commits). The Breaker and Cutters were cut in M6 and restored in M7. Defusing takes 7 s
+and the Fuse burns 35 s.
 
 Damage multipliers: head ×4, chest/stomach ×1, arms ×0.9, legs ×0.75. Armor: body damage × armorRatio
 (0.5) to health, rest to armor; helm reduces head damage to ×(4 × 0.6). Range falloff per weapon

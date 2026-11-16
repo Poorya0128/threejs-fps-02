@@ -28,7 +28,7 @@ export function startRound(state) {
 	const n = { strand: 0, bastion: 0 }, strand = state.agents.filter((a) => a.team === 'strand');
 	for (const a of state.agents) {
 		const sp = state.map.spawns[a.team], o = SPAWN_OFF[n[a.team]++ % 5], s = a.team === 'strand' ? 1 : -1;
-		if (!a.alive) { a.weapons.length = a.armor = 0; a.helm = false; a.nades.shard = a.nades.veil = 0; giveWeapon(a, 'wren'); }
+		if (!a.alive) { a.weapons.length = a.armor = 0; a.helm = a.hasCutters = false; a.nades.shard = a.nades.veil = 0; giveWeapon(a, 'wren'); }
 		a.pos.set(sp[0] + o[0] * s, 0, sp[1] + o[1]); a.prevPos.copy(a.pos); a.vel.set(0, 0, 0); a.recoil.pitch = a.recoil.yaw = 0;
 		Object.assign(a, { yaw: -s * Math.PI / 2, pitch: 0, alive: true, hp: 100, roundKills: 0, crouch: 0, plantT: 0, defuseT: 0, spreadBloom: 0,
 			shotsFired: 0, reloadT: 0, scoped: false, scopeLevel: 0, grenadeMode: false, hasFuse: false, active: a.weapons[0] ? 0 : 1 });
@@ -82,6 +82,6 @@ export function defuseCharge(state, a, dt) {
 	const f = state.fuse;
 	if (state.phase !== 'planted' || a.team !== 'bastion' || !near(a, f.x, f.z, 1.6) || !still(a)) { a.defuseT = 0; return; }
 	if (a.defuseT === 0) pushNoise(state, a.pos.x, a.pos.y, a.pos.z, 26, a.team, 2);
-	if ((a.defuseT += dt) < ROUND.defuseTime) return;
+	if ((a.defuseT += dt) < (a.hasCutters ? ROUND.defuseCuttersTime : ROUND.defuseTime)) return;
 	a.defuseT = 0; f.planted = false; feed(state, `${a.name} cut the Fuse`); endRound(state, 'bastion', 'defuse');
 }

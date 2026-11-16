@@ -17,7 +17,7 @@ const holds = (state, flag) => state.nodes.flatMap((n, i) => ((n[4] & flag) && (
 const SITE = { pans: 2, boiler: 4 }, MOVE = { x: 0, z: 0 }, UTIL = ['shard', 'veil'];
 
 const createBrain = (skill) => ({ skill, state: 'idle', route: [], ri: 0, target: null, reactT: 0, err: 0, ex: 0, burst: 0, pause: 0, headAim: false,
-	scanT: 0, lostT: 0, noiseT: 0, pieT: 0, smoothT: 0, stuckT: 0, lastD: 1e9, detourT: 0, detour: 1, crouch: false, hold: -1,
+	scanT: 0, lostT: 0, noiseT: 0, smoothT: 0, stuckT: 0, lastD: 1e9, detourT: 0, detour: 1, crouch: false, hold: -1,
 	known: { x: 0, z: 0, t: -99 }, callT: -99, utilT: 0, fragT: -99, retake: 0, post: 0, push: 0 });
 export function spawnBots(state, nav) {
 	state.nav = nav;
@@ -30,7 +30,7 @@ function teamBuy(state, team) {
 	const avg = mates.reduce((s, a) => s + a.money, 0) / mates.length, point = Math.max(state.score.strand, state.score.bastion) === ROUND.winRounds - 1;
 	const mode = avg >= 3700 ? 'full' : avg >= 1900 && (state.lossStreak[team] >= 2 || point) ? 'force' : 'save';
 	for (const b of mates) {
-		const gun = b.weapons[0] ? [] : mode === 'full' ? [['talon', 'gavel', 'talon', 'longbow'][b.id % 4], 'helm'] : ['hornet'];
+		const gun = b.weapons[0] ? [] : mode === 'full' ? [['talon', 'gavel', 'talon', 'longbow'][b.id % 4], 'helm', 'cutters'] : [b.id % 3 ? 'hornet' : 'breaker'];
 		if (mode !== 'save') for (const id of [...gun, 'armor', 'veil', 'shard']) buyItem(state, b, id);
 	}
 }
@@ -127,7 +127,7 @@ function followRoute(state, bot, dt) {
 		}
 	}
 	const n = state.nodes[br.route[br.ri]];
-	if (steer(bot, n[1], n[2], dt) < .7) { if (n[4] & 1) br.pieT = .8; br.ri++; br.lastD = 1e9; }
+	if (steer(bot, n[1], n[2], dt) < .7) { br.ri++; br.lastD = 1e9; }
 	return true;
 }
 
@@ -176,7 +176,7 @@ function utility(state, bot, dt) {
 }
 
 // One tick of a bot (or the autoplay player) through the shared systems. It stops to fire, as computeSpread punishes
-// moving shots, except with an SMG up close.
+// moving shots, except with an SMG or shotgun up close.
 export function driveAgent(state, bot, dt) {
 	const br = bot.brain, f = state.fuse, w = activeWeapon(bot), run = maxSpeed(bot), am = bot.ammo[activeId(bot)];
 	if (!bot.alive) return;
@@ -186,7 +186,7 @@ export function driveAgent(state, bot, dt) {
 		if (br.state === 'engage' && br.target?.alive) {
 			const t = br.target, dist = Math.sqrt(D2(bot, t.pos.x, t.pos.z)), sk = br.skill, off = (br.err *= Math.exp(-1.4 * dt)) * dist;
 			const miss = aimAt(bot, t.pos.x + Math.cos(br.ex) * off, t.pos.y + t.eyeHeight - (br.headAim ? 0 : .38) + Math.sin(br.ex) * off * .6, t.pos.z + Math.sin(br.ex) * off, dt, 10);
-			const close = dist < 11 && w.cls === 'smg';
+			const close = dist < 11 && (w.cls === 'smg' || w.cls === 'shotgun');
 			crouch = br.crouch && dist > 12 && w.cls !== 'marksman';
 			if ((br.reactT -= dt) <= 0 && miss < .06 + computeSpread(bot) * 2) {
 				if (br.burst <= 0 && (br.pause -= dt) <= 0) { br.burst = dist < 9 ? 10 : sk.burst[0] + Math.floor(state.rng() * (sk.burst[1] - sk.burst[0] + 1)); br.headAim = state.rng() < sk.head; }
@@ -200,7 +200,7 @@ export function driveAgent(state, bot, dt) {
 		} else if (br.state === 'defuse' && f.planted) {
 			if (D2(bot, f.x, f.z) < 1.2) { defuseCharge(state, bot, dt); crouch = true; }
 			else { if (!followRoute(state, bot, dt)) steer(bot, f.x, f.z, dt); gait = 1; }
-		} else if (followRoute(state, bot, dt)) { gait = br.pieT > 0 ? .5 : 1; br.pieT -= dt; }
+		} else if (followRoute(state, bot, dt)) gait = 1;
 		else if (br.state === 'fetch') { steer(bot, f.x, f.z, dt); gait = 1; if (!f.dropped) br.state = 'followRoute'; }
 		else if (br.hold >= 0) {
 			const n = state.nodes[br.hold], watch = f.planted && bot.team === 'strand'; // after the plant, Strand watches the Fuse

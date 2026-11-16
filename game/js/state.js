@@ -11,7 +11,7 @@ export function createAgent(id, team, isBot, x, z) {
 		pos: new Vector3(x, 0, z), prevPos: new Vector3(x, 0, z), vel: new Vector3(), yaw: 0, pitch: 0, crouch: 0, onGround: true, eyeHeight: MOVE.eyeStand,
 		weapons: [], active: 0, ammo: {}, reloadT: 0, nextFireT: 0, switchT: 0, lastWeapon: 0, scoped: false, scopeLevel: 0, prevAlt: false,
 		shotsFired: 0, lastShotT: -99, recoil: { pitch: 0, yaw: 0 }, spreadBloom: 0,
-		hasFuse: false, plantT: 0, defuseT: 0, nades: { shard: 0, veil: 0 }, grenadeMode: false, nadeSel: 'shard',
+		hasFuse: false, hasCutters: false, plantT: 0, defuseT: 0, nades: { shard: 0, veil: 0 }, grenadeMode: false, nadeSel: 'shard',
 		kills: 0, deaths: 0, headshots: 0, roundKills: 0, lastHit: { t: -1, head: false }, hurtT: -9,
 		stepAcc: 0, walkPhase: 0, speed: 0, brain: null,
 	};

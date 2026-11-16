@@ -53,7 +53,7 @@ export function createHud(map) {
 		rc.font = 'bold 11px sans-serif'; rc.fillStyle = AMBER; rc.fillText('N', R + Math.sin(v.yaw) * (R - 11), R - Math.cos(v.yaw) * (R - 11) + 4);
 	}
 	const card = (p, [id, key, note]) => {
-		const own = owns(p, id), off = p.money < priceOf(id);
+		const own = owns(p, id), off = p.money < priceOf(id) || (id === 'cutters' && p.team !== 'bastion');
 		return `<div class="it ${own ? 'own' : off ? 'off' : ''}" data-id="${id}"><kbd>${key}</kbd><b>${nameOf(id)}</b><s>${own ? 'OWNED' : '$' + priceOf(id)}</s><small>${note}</small></div>`;
 	};
 	const buyMenu = (state, p = state.player) => `<header><h3>REQUISITION</h3><span class="lbl">${Math.max(0, Math.ceil(state.roundT))} S · B CLOSES · KEYS OR CLICK</span><span class="cr">$${p.money}</span></header>`
@@ -82,7 +82,7 @@ export function createHud(map) {
 			cls('ammo', 'low', !nade && am.mag <= Math.ceil(w.mag / 5));
 			text('wname', nade ? GRENADES[v.nadeSel].name : `${w.name}${v.reloadT > 0 ? ' · RELOADING' : ''}`);
 			for (const [k, id] of NADES) { text(k, `${GRENADES[id].name}${v.nades[id] > 1 ? ' ×' + v.nades[id] : ''}`); cls(k, 'on', v.nades[id] > 0); cls(k, 'sel', nade && v.nadeSel === id); }
-			text('kit', v.hasFuse ? 'FUSE' : '');
+			text('kit', v.hasFuse ? 'FUSE' : v.hasCutters ? 'CUTTERS' : '');
 			text('timer', `${Math.floor(t / 60)}:${String(t % 60).padStart(2, '0')}`); cls('timer', 'hot', phase === 'planted' || (phase === 'live' && t <= 10));
 			text('rnd', phase === 'planted' ? 'FUSE PLANTED' : `ROUND ${state.round}${phase === 'buy' ? ' · BUY' : ''}`);
 			text('scS', state.score.strand); text('scB', state.score.bastion);
@@ -95,7 +95,7 @@ export function createHud(map) {
 			if (show('banner', !!bn && state.time - bn.t < (bn.text === 'GO' ? 1.2 : 3.5) && !state.buyOpen)) { text('bT', bn.text); text('bS', bn.sub); }
 			if (show('prog', v.plantT > 0 || v.defuseT > 0)) {
 				text('progL', v.plantT > 0 ? 'PLANTING THE FUSE' : 'CUTTING THE FUSE');
-				width('progB', Math.round(100 * (v.plantT > 0 ? v.plantT / ROUND.plantTime : v.defuseT / ROUND.defuseTime)));
+				width('progB', Math.round(100 * (v.plantT > 0 ? v.plantT / ROUND.plantTime : v.defuseT / (v.hasCutters ? ROUND.defuseCuttersTime : ROUND.defuseTime))));
 			}
 			const nearFuse = f.planted && v.team === 'bastion' && Math.hypot(v.pos.x - f.x, v.pos.z - f.z) < 1.6;
 			text('prompt', v.plantT > 0 || v.defuseT > 0 ? '' : v.hasFuse && phase === 'live' && siteAt(state, v.pos.x, v.pos.z) ? 'HOLD E TO PLANT THE FUSE'

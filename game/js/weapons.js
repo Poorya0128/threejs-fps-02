@@ -80,7 +80,7 @@ export function applyHit(state, shooter, target, group, dmg, dist, w) {
 	shooter.lastHit.t = state.time; shooter.lastHit.head = head;
 	pushFx(state, 6, target.pos.x, target.pos.y + 1, target.pos.z, 0, 0, 0, target.id);
 	if (target.hp > 0) return false;
-	target.hp = 0; target.alive = false; target.deaths++;
+	Object.assign(target, { hp: 0, alive: false, scoped: false, scopeLevel: 0 }); target.deaths++;
 	shooter.kills++; shooter.roundKills++; shooter.headshots += head;
 	shooter.money = Math.min(ECON.cap, shooter.money + (ECON.kill[w.cls] || 0));
 	feed(state, '', { a: shooter.name, b: target.name, w: w.name, head });
@@ -89,7 +89,7 @@ export function applyHit(state, shooter, target, group, dmg, dist, w) {
 
 function startReload(a) {
 	const w = activeWeapon(a), am = a.ammo[activeId(a)];
-	if (am.mag < w.mag && am.reserve > 0 && a.reloadT <= 0) a.reloadT = w.reload;
+	if (am.mag < w.mag && am.reserve > 0 && a.reloadT <= 0) Object.assign(a, { reloadT: w.reload, scoped: false, scopeLevel: 0 });
 }
 
 export function switchWeapon(a, idx) {
@@ -98,26 +98,29 @@ export function switchWeapon(a, idx) {
 	a.recoil.pitch = a.recoil.yaw = 0;
 }
 
-// One shot: muzzle flash and casing, a ray inside the spread cone, then a hit, or a bullet hole and impact; every other
-// round is a tracer.
+// One shot: muzzle flash and casing, then per pellet a ray inside the spread cone that hits, or leaves a bullet hole and
+// an impact; the first pellet draws a tracer.
 export function tryFire(state, a, held, edge) {
 	const w = activeWeapon(a), am = a.ammo[activeId(a)];
 	if (a.switchT > 0 || a.reloadT > 0 || state.time < a.nextFireT || !(w.auto ? held : edge)) return;
 	if (am.mag <= 0) { a.nextFireT = state.time + .25; return startReload(a); }
 	am.mag--; a.nextFireT = state.time + 60 / w.rpm; state.shots.fired++;
-	const spread = computeSpread(a) * Math.sqrt(state.rng()), ang = state.rng() * 6.2832;
+	const spread = computeSpread(a);
 	applyRecoil(state, a, w);
 	eyePos(a, _eye); _right.set(Math.cos(a.yaw), 0, -Math.sin(a.yaw));
 	viewDir(a, _muz).multiplyScalar(.62).add(_eye).addScaledVector(_right, .12).y -= .1;
 	pushFx(state, 1, _muz.x, _muz.y, _muz.z, 0, 0, 0, 0);
 	pushFx(state, 4, _muz.x - _right.x * .04, _muz.y, _muz.z - _right.z * .04, _right.x, 0, _right.z, 0);
-	viewDir(a, _dir).addScaledVector(_right, Math.cos(ang) * spread).y += Math.sin(ang) * spread;
-	_dir.normalize();
-	const h = traceShot(state, a, _eye.x, _eye.y, _eye.z, _dir.x, _dir.y, _dir.z, 250);
-	const ex = h ? h.x : _eye.x + _dir.x * 250, ey = h ? h.y : _eye.y + _dir.y * 250, ez = h ? h.z : _eye.z + _dir.z * 250;
-	if (h?.target) applyHit(state, a, h.target, h.group, w.dmg, h.t, w);
-	else if (h) { pushFx(state, 2, ex, ey, ez, h.nx, h.ny, h.nz, h.mat); pushFx(state, 3, ex, ey, ez, h.nx, h.ny, h.nz, h.mat); }
-	if (state.shots.fired % 2 === 0) pushFx(state, 0, _muz.x, _muz.y, _muz.z, ex, ey, ez, 0);
+	for (let i = 0; i < (w.pellets ?? 1); i++) {
+		const r = spread * Math.sqrt(state.rng()), ang = state.rng() * 6.2832;
+		viewDir(a, _dir).addScaledVector(_right, Math.cos(ang) * r).y += Math.sin(ang) * r;
+		_dir.normalize();
+		const h = traceShot(state, a, _eye.x, _eye.y, _eye.z, _dir.x, _dir.y, _dir.z, 250);
+		const ex = h ? h.x : _eye.x + _dir.x * 250, ey = h ? h.y : _eye.y + _dir.y * 250, ez = h ? h.z : _eye.z + _dir.z * 250;
+		if (h?.target) applyHit(state, a, h.target, h.group, w.dmg, h.t, w);
+		else if (h) { pushFx(state, 2, ex, ey, ez, h.nx, h.ny, h.nz, h.mat); pushFx(state, 3, ex, ey, ez, h.nx, h.ny, h.nz, h.mat); }
+		if (!i) pushFx(state, 0, _muz.x, _muz.y, _muz.z, ex, ey, ez, 0);
+	}
 	pushNoise(state, a.pos.x, a.pos.y, a.pos.z, w.noise, a.team, 1);
 	if (am.mag === 0) startReload(a);
 }

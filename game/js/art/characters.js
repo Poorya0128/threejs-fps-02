@@ -96,7 +96,7 @@ export function createCharacters(scene) {
 	function holdWeapon(r, id) {
 		if (r.wid === id) return;
 		if (!guns[id]) {
-			const w = guns[id] = buildWeapon(id, true), h = buildHands(w, ...GLOVE);
+			const w = guns[id] = buildWeapon(id, true), h = buildHands(w, GLOVE);
 			h.R.merge(h.L); w.group.add(new Mesh(h.R.geo(), weaponMaterial)); w.rw = h.rw; w.lw = h.lw;
 		}
 		const w = guns[id], pistol = w.grip && !w.left;

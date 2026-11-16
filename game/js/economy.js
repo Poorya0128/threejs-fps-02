@@ -16,12 +16,13 @@ export function awardRoundMoney(state, winner, reason) {
 }
 
 export const owns = (a, id) => (WEAPONS[id] ? a.weapons.includes(id) : id === 'armor' ? a.armor >= 100 : id === 'helm' ? a.helm && a.armor >= 100
-	: a.nades[id] >= GRENADES[id].max);
+	: id === 'cutters' ? a.hasCutters : a.nades[id] >= GRENADES[id].max);
 
 export function buyItem(state, a, id) {
 	const cost = priceOf(id);
-	if (a.money < cost || !a.alive || owns(a, id)) return false;
+	if (a.money < cost || !a.alive || owns(a, id) || (id === 'cutters' && a.team !== 'bastion')) return false;
 	if (id === 'armor' || id === 'helm') { a.armor = 100; a.helm ||= id === 'helm'; }
+	else if (id === 'cutters') a.hasCutters = true;
 	else if (GRENADES[id]) a.nades[id]++;
 	else { a.active = giveWeapon(a, id); a.grenadeMode = false; }
 	a.money -= cost;
