@@ -1,6 +1,4 @@
-// SALTLINE art/post.js — HDR pipeline (ART.md §2): the world renders into a 4× MSAA half-float target, bloom runs a
-// three-level 13-tap downsample / 9-tap tent upsample chain, and the final pass applies exposure, ACES, a warm grade,
-// a vignette and fine grain.
+// HDR pipeline (ART.md §2): MSAA half-float target, bloom, exposure, ACES, grade, vignette, grain.
 import { ShaderMaterial, WebGLRenderTarget, HalfFloatType, Vector2, Scene, OrthographicCamera, Mesh, BufferGeometry, BufferAttribute } from 'three';
 import { RENDER } from '../config.js';
 
@@ -9,7 +7,7 @@ const pass = (body, uniforms) => new ShaderMaterial({ uniforms: { tSrc: { value:
 	fragmentShader: `varying vec2 vUv;uniform sampler2D tSrc,tAdd;uniform vec2 texel;uniform float uK,time;
 	vec3 at(float i,float j){return texture2D(tSrc,vUv+texel*vec2(i,j)).rgb;}
 	void main(){${body}}` });
-// Down: weighted 5×5 pattern, thresholded on the first level. Up: 3×3 tent plus the next finer down level.
+// Down: 13 taps (thresholded first). Up: 3×3 tent plus the finer level.
 const down = pass(`vec3 c=vec3(0);
 	for(int i=-2;i<=2;i++)for(int j=-2;j<=2;j++){int m=abs(i)+abs(j);c+=at(float(i),float(j))*(m==0?4.:m==1?2.:m==2&&(i==0||j==0||abs(i)==1)?1.:0.);}
 	gl_FragColor=vec4(max(c*.0625-uK,0.),1.);`, { uK: { value: 0 } });
@@ -28,7 +26,7 @@ export function createPost(renderer) {
 	const size = renderer.getSize(new Vector2()), rt = (w, h, o) => new WebGLRenderTarget(Math.max(2, w | 0), Math.max(2, h | 0), { type: HalfFloatType, ...o });
 	const hdr = rt(size.x, size.y, { samples: 4 }), downs = [0, 1, 2].map((i) => rt(size.x / 2 >> i, size.y / 2 >> i)), ups = [0, 1, 2].map((i) => rt(size.x / 2 >> i, size.y / 2 >> i));
 	const scene = new Scene(), cam = new OrthographicCamera(-1, 1, 1, -1, 0, 1), geo = new BufferGeometry(), quad = new Mesh(geo);
-	geo.setAttribute('position', new BufferAttribute(new Float32Array([-1, -1, 0, 3, -1, 0, -1, 3, 0]), 3)); // one triangle covers the screen
+	geo.setAttribute('position', new BufferAttribute(new Float32Array([-1, -1, 0, 3, -1, 0, -1, 3, 0]), 3));
 	geo.setAttribute('uv', new BufferAttribute(new Float32Array([0, 0, 2, 0, 0, 2]), 2));
 	quad.frustumCulled = false; scene.add(quad);
 	const draw = (mat, src, target, k, add = null) => {

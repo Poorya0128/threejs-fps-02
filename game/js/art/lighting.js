@@ -1,9 +1,8 @@
-// SALTLINE art/lighting.js — dusk sun with a fitted 4096² shadow map, sky fill, the sky dome and image-based light
-// from a PMREM of that sky (ART.md §3, §8). Interior point lights are placed by geo.js from map props.
+// Dusk sun with a fitted shadow map, sky dome and image light from its PMREM (ART.md §3, §8).
 import { ShaderMaterial, BackSide, Color, Vector3, Mesh, SphereGeometry, CircleGeometry, MeshBasicMaterial, DirectionalLight, HemisphereLight, PMREMGenerator, Scene, FogExp2 } from 'three';
 import { RENDER } from '../config.js';
 
-// Sky: elevation gradient, warm haze on the sun side, Mie glow, an HDR sun disc for bloom and FBM cloud banks.
+// Sky: gradient, warm haze and glow toward the sun, an HDR sun disc, FBM clouds.
 function skyMaterial(sunDir) {
 	return new ShaderMaterial({
 		side: BackSide, depthWrite: false, fog: false,
@@ -39,7 +38,6 @@ export function buildLighting(renderer, scene) {
 	Object.assign(sh, { bias: RENDER.shadowBias, normalBias: RENDER.shadowNormalBias, radius: RENDER.shadowRadius });
 	scene.add(sun, sun.target, new HemisphereLight(RENDER.hemiSky, RENDER.hemiGround, RENDER.hemiIntensity), new Mesh(new SphereGeometry(450, 32, 16), skyMaterial(dir)));
 	scene.fog = new FogExp2(RENDER.fogColor, RENDER.fogDensity);
-	// Environment light: the same sky over a dusty ground disc, prefiltered once.
 	const env = new Scene(), pm = new PMREMGenerator(renderer), floor = new Mesh(new CircleGeometry(60, 24), new MeshBasicMaterial({ color: 0x5c5048 }));
 	floor.rotation.x = -Math.PI / 2; floor.position.y = -2;
 	env.add(new Mesh(new SphereGeometry(50, 32, 16), skyMaterial(dir)), floor);

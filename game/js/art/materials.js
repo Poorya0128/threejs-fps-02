@@ -1,6 +1,4 @@
-// SALTLINE art/materials.js — procedural PBR (ART.md §5). One GLSL chunk is injected into MeshStandardMaterial:
-// object-space patterns (formwork, brick, corrugation, planks, hazard, asphalt, salt, cloth…), roughness variation,
-// bump from the pattern height, edge wear on bevels (vertex attribute aE), dirt and salt rime at wall bases.
+// Procedural PBR (ART.md §5): GLSL patterns, roughness, bump, edge wear, dirt and rime in MeshStandardMaterial.
 import { MeshStandardMaterial, Color, Vector4 } from 'three';
 
 const GLSL = /* glsl */`
@@ -46,24 +44,23 @@ void surface(out vec3 c,out float r,out float h,out float mt){
 	c*=(.88+.24*h3(vec3(floor(b),4.)))*(1.-.35*m);h=h*.4-m*.7;}
 	else if(P==11){float k=smoothstep(.66,.74,fbm(vW*.7)+.2*f);c=mix(c*(.92+.1*n),uC2*(.94+.06*f),k);
 	r=mix(.05,.75,k);h=k*(.4+f*.4);}
-	else if(P==12){if(vE>2.5){r=.45;mt=0.;}else if(vE>1.5){r=.38+.2*n;mt=1.;}else if(vE>.5){r=.62+.2*f;mt=0.;h=f*.4;}else{float w=sin(q.x*380.)*sin(q.y*380.);h=w*.12+n*.3;r=.88;mt=0.;}}
-	if(P<12){
-	float side=1.-an.y,y=vW.y;
-	float d=(1.-smoothstep(0.,1.5,y))*smoothstep(.3,.7,fbm(vW*.8+5.))*uL.y*side;
-	c*=1.-.5*d;r=min(1.,r+.2*d);
+	else{if(vE>2.5){r=.45;mt=0.;}else if(vE>1.5){r=.38+.2*n;}else if(vE>.5){r=.62+.2*f;mt=0.;h=f*.4;}else{float w=sin(q.x*380.)*sin(q.y*380.);h=w*.12+n*.3;r=.88;mt=0.;}}
+	if(P<12){float side=1.-an.y,y=vW.y;
+	float d=(1.-smoothstep(0.,1.5,y))*smoothstep(.3,.7,fbm(vW*.8+5.))*uL.y*side;c*=1.-.5*d;r=min(1.,r+.2*d);
 	float rm=uL.z*(1.-smoothstep(.05,.45+.35*n,y))*side;c=mix(c,vec3(.92,.91,.87),rm*.85);r=mix(r,.95,rm);h+=rm*f*.6;
-	float we=uL.w*vE*smoothstep(.3,.55,fbm(vP*7.));c=mix(c,c*1.4+.05,we);r*=1.-.3*we;
-	}
+	float we=uL.w*vE*smoothstep(.3,.55,fbm(vP*7.));c=mix(c,c*1.4+.05,we);r*=1.-.3*we;}
 	r=clamp(r,.05,1.);
 }`;
 const BUMP = `{vec3 dx=dFdx(-vViewPosition),dy=dFdy(-vViewPosition);float hx=dFdx(ph),hy=dFdy(ph);
 	vec3 r1=cross(dy,normal),r2=cross(normal,dx);float dt=dot(dx,r1);
 	normal=normalize(abs(dt)*normal-sign(dt)*(hx*r1+hy*r2)*uL.x/(1.+length(vViewPosition)*.06));}`;
+// Characters (pattern 12; uL = bump, rim, accent glow, hit flash): fresnel rim, glowing accents, hit flash.
+const GLOW = `if(int(uPat+.5)==12)totalEmissiveRadiance+=diffuseColor.rgb*step(2.5,vE)*uL.z+vec3(1.,.4,.3)*uL.w
+	+vec3(1.,.92,.82)*pow(1.-abs(dot(normal,normalize(vViewPosition))),3.)*uL.y*(.35+.65*diffuseColor.rgb);`;
 
-// o: { c, c2, pat, scale, cvar, r0, r1, bump, dirt, rime, wear, metal, env, vc }. Shared program: per-material
-// values travel in uniforms (m.userData.u), so every surface in the game compiles one shader per light setup.
+// o: { c, c2, pat, scale, cvar, r0, r1, bump, dirt, rime, wear, metal, env } in uniforms, so all share one program.
 export function procMaterial(o) {
-	const m = new MeshStandardMaterial({ color: o.c, metalness: o.metal ?? 0, roughness: 1, vertexColors: o.vc ?? true, envMapIntensity: o.env ?? 1 });
+	const m = new MeshStandardMaterial({ color: o.c, metalness: o.metal ?? 0, roughness: 1, vertexColors: true, envMapIntensity: o.env ?? 1 });
 	const u = m.userData.u = {
 		uPat: { value: o.pat ?? 9 }, uC2: { value: new Color(o.c2 ?? 0) },
 		uK: { value: new Vector4(o.scale ?? 1, o.cvar ?? .08, o.r0 ?? .6, o.r1 ?? .9) },
@@ -74,49 +71,39 @@ export function procMaterial(o) {
 		sh.vertexShader = sh.vertexShader
 			.replace('#include <common>', '#include <common>\nvarying vec3 vP,vW,vN;varying float vE;attribute float aE;')
 			.replace('#include <begin_vertex>', '#include <begin_vertex>\nvP=position;vN=normal;vE=aE;')
-			.replace('#include <project_vertex>', `#include <project_vertex>
-	vec4 wq=vec4(transformed,1.);
-	#ifdef USE_INSTANCING
-	wq=instanceMatrix*wq;
-	#endif
-	vW=(modelMatrix*wq).xyz;`);
+			.replace('#include <project_vertex>', '#include <project_vertex>\nvW=(modelMatrix*vec4(transformed,1.)).xyz;');
 		sh.fragmentShader = sh.fragmentShader
 			.replace('#include <common>', `#include <common>\n${GLSL}`)
 			.replace('#include <map_fragment>', '#include <map_fragment>\nvec3 pc;float pr,ph,pm;surface(pc,pr,ph,pm);diffuseColor.rgb=pc;')
 			.replace('#include <roughnessmap_fragment>', 'float roughnessFactor=pr;')
 			.replace('#include <metalnessmap_fragment>', 'float metalnessFactor=metalness*pm;')
 			.replace('#include <normal_fragment_maps>', `#include <normal_fragment_maps>\n${BUMP}`)
-			// Characters (pattern 12; uL = bump, rim, accent glow, hit flash): a fresnel rim and glowing team accents keep
-			// soldiers from falling to a black silhouette in shade, and a short red-white flash shows a hit.
-			.replace('#include <emissivemap_fragment>', `#include <emissivemap_fragment>
-	if(int(uPat+.5)==12)totalEmissiveRadiance+=diffuseColor.rgb*step(2.5,vE)*uL.z+vec3(1.,.4,.3)*uL.w
-	+vec3(1.,.92,.82)*pow(1.-abs(dot(normal,normalize(vViewPosition))),3.)*uL.y*(.35+.65*diffuseColor.rgb);`);
+			.replace('#include <emissivemap_fragment>', `#include <emissivemap_fragment>\n${GLOW}`);
 	};
 	m.customProgramCacheKey = () => 'saltline-proc';
 	return m;
 }
 
-// World material presets by map material id (map.js). pat: 0 formwork concrete, 1 plaster over brick, 2 metal,
-// 3 corrugated, 4 planks, 5 hazard, 6 asphalt, 7 salt crust, 8 cloth, 9 polymer, 10 block masonry, 11 brine, 12 character.
+// World presets by map material id. pat: 0 formwork concrete, 1 plaster over brick, 2 metal, 3 corrugated, 4 planks,
+// 5 hazard, 6 asphalt, 7 salt crust, 8 cloth, 9 polymer, 10 block masonry, 11 brine, 12 character.
+const tin = (c, c2, o) => ({ c, c2, pat: 3, scale: .7, r0: .5, r1: .75, metal: .15, bump: .04, dirt: .6, rime: .5, wear: 1, ...o });
 export const WORLD = [
 	{ c: 0xb9b2a4, pat: 0, scale: .6, cvar: .1, r0: .75, r1: .95, bump: .025, dirt: 1, rime: 1, wear: .6 },
-	{ c: 0xd8d2c4, pat: 10, scale: .8, r0: .8, r1: .95, bump: .02, dirt: .7, rime: 1, wear: .5 },
+	{ c: 0xd8d2c4, pat: 10, scale: .8, r0: .8, r1: .95, dirt: .7, rime: 1, wear: .5 },
 	{ c: 0x62676d, c2: 0x7a4a2c, pat: 2, scale: .9, r0: .45, r1: .7, metal: .35, bump: .01, dirt: .4, wear: 1 },
-	{ c: 0x9a4430, c2: 0x5a2c1a, pat: 3, scale: .7, r0: .5, r1: .75, metal: .15, bump: .04, dirt: .6, rime: .5, wear: 1 },
-	{ c: 0x3b7f78, c2: 0x6b3a22, pat: 3, scale: .7, r0: .5, r1: .75, metal: .15, bump: .04, dirt: .6, rime: .5, wear: 1 },
-	{ c: 0xe39a2e, c2: 0x1c1c1e, pat: 5, scale: 1, r0: .5, r1: .7, bump: .02, dirt: .8, wear: .8 },
-	{ c: 0x9a7650, pat: 4, scale: 1.2, cvar: .12, r0: .7, r1: .9, bump: .03, dirt: .5, wear: .8 },
-	{ c: 0x4a4744, c2: 0x6b3a22, pat: 3, scale: .6, r0: .6, r1: .85, metal: .2, bump: .03 },
+	tin(0x9a4430, 0x5a2c1a), tin(0x3b7f78, 0x6b3a22),
+	{ c: 0xe39a2e, c2: 0x1c1c1e, pat: 5, r0: .5, r1: .7, dirt: .8, wear: .8 },
+	{ c: 0x9a7650, pat: 4, scale: 1.2, cvar: .12, r0: .7, bump: .03, dirt: .5, wear: .8 },
+	tin(0x4a4744, 0x6b3a22, { scale: .6, r0: .6, r1: .85, metal: .2, bump: .03, dirt: 0, rime: 0, wear: 0 }),
 	{ c: 0xcdbfa8, c2: 0x8a6250, pat: 1, scale: .5, cvar: .1, r0: .8, r1: .95, bump: .025, dirt: 1, rime: .8, wear: .5 },
 	{ c: 0xb4b8ba, c2: 0x7a4a2c, pat: 2, scale: .8, r0: .35, r1: .55, metal: .55, bump: .01, dirt: .5, rime: .4, wear: 1 },
-	{ c: 0x4a6278, c2: 0x5a2c1a, pat: 3, scale: .7, r0: .5, r1: .75, metal: .15, bump: .04, dirt: .6, rime: .5, wear: 1 },
-	{ c: 0xa3a6a6, c2: 0x7a4a2c, pat: 3, scale: .7, r0: .4, r1: .6, metal: .45, bump: .035, dirt: .7, rime: .6, wear: 1 },
+	tin(0x4a6278, 0x5a2c1a), tin(0xa3a6a6, 0x7a4a2c, { r0: .4, r1: .6, metal: .45, bump: .035, dirt: .7, rime: .6 }),
 ];
-// Ground kinds used by map floors: asphalt, concrete slab, salt gravel, brine basin, wet culvert concrete.
+// Floors: asphalt, concrete, salt gravel, brine, wet concrete.
 export const GROUND = [
 	{ c: 0x76716a, pat: 6, scale: 1.4, cvar: .1, r0: .75, r1: .95, bump: .03 },
-	{ c: 0x9d978c, pat: 0, scale: .6, cvar: .12, r0: .7, r1: .92, bump: .02 },
+	{ c: 0x9d978c, pat: 0, scale: .6, cvar: .12, r0: .7, r1: .92 },
 	{ c: 0xd9d1c4, pat: 7, scale: 1.5, cvar: .06, r0: .75, r1: .95, bump: .04 },
-	{ c: 0x9c8682, c2: 0xece7de, pat: 11, scale: 1, cvar: .06, bump: .015 },
+	{ c: 0x9c8682, c2: 0xece7de, pat: 11, cvar: .06, bump: .015 },
 	{ c: 0x6e6c66, pat: 6, scale: 1.2, cvar: .1, r0: .25, r1: .6, bump: .025 },
 ];
