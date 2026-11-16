@@ -1,166 +1,108 @@
-// SALTLINE hud.js — HUD fields with dirty-checking (§5.1, §12).
-const $ = (id) => document.getElementById(id);
-import { ROUND, BUY, GRENADES, WEAPONS } from './config.js';
+// HUD and menus (PLAN.md §12), dirty-checked: the DOM is written only on change.
+import { ROUND, BUY, GRENADES } from './config.js';
 import { computeSpread, activeWeapon, activeId } from './weapons.js';
-import { buyItem } from './economy.js';
+import { buyItem, priceOf, nameOf, owns } from './economy.js';
+import { siteAt } from './rounds.js';
 
-export function createHud() {
-  const el = {};
-  for (const [k, s] of [['hp'], ['hpBar'], ['armor'], ['ammo'], ['weapon'], ['timer'], ['score'], ['round'], ['hint'], ['cross'], ['hitmark'], ['killfeed'], ['scope'], ['money'], ['pips'], ['banner'], ['progress'], ['progBar'], ['progLabel'], ['board', 'scoreboard'], ['spec', 'spectate'], ['buy'], ['flash']]) el[k] = $(`hud-${s || k.toLowerCase()}`);
-  const radar = $('hud-radar'), rctx = radar ? radar.getContext('2d') : null;
-  const radarBg = document.createElement('canvas'); radarBg.width = radarBg.height = 140;
-  let radarBounds = null, bgReady = false, lastBuyHtml = '';
-  let curState = null;
-  if (el.buy) el.buy.addEventListener('click', (ev) => {
-    const row = ev.target.closest('[data-id]');
-    if (!row || !curState || !curState.buyOpen) return;
-    buyItem(curState, curState.player, row.dataset.id);
-  });
-  function drawRadar(state) {
-    if (!rctx) return;
-    if (!bgReady) {
-      const B = state.map.bounds;
-      radarBounds = { minX: B.x0, maxX: B.x1, minZ: B.z0, maxZ: B.z1 };
-      const b = radarBg.getContext('2d');
-      b.fillStyle = 'rgba(10,12,14,0.72)'; b.fillRect(0, 0, 140, 140);
-      b.fillStyle = 'rgba(232,226,214,0.35)';
-      for (const box of state.boxes) {
-        b.fillRect((box.min.x - B.x0) / (B.x1 - B.x0) * 140, (box.min.z - B.z0) / (B.z1 - B.z0) * 140,
-          Math.max(1, (box.max.x - box.min.x) / (B.x1 - B.x0) * 140), Math.max(1, (box.max.z - box.min.z) / (B.z1 - B.z0) * 140));
-      }
-      bgReady = true;
-    }
-    const B = radarBounds;
-    const px = (x) => (x - B.minX) / (B.maxX - B.minX) * 140;
-    const pz = (z) => (z - B.minZ) / (B.maxZ - B.minZ) * 140;
-    const dot = (x, y, r, c) => { rctx.fillStyle = c; rctx.beginPath(); rctx.arc(x, y, r, 0, 7); rctx.fill(); };
-    rctx.clearRect(0, 0, 140, 140);
-    rctx.drawImage(radarBg, 0, 0);
-    const z = state.zones;
-    rctx.fillStyle = '#e8e2d6'; rctx.font = 'bold 10px sans-serif'; rctx.textAlign = 'center';
-    rctx.fillText('P', px(z.sitePans.cx), pz(z.sitePans.cz));
-    rctx.fillText('B', px(z.siteBoiler.cx), pz(z.siteBoiler.cz));
-    if (state.fuse && state.fuse.planted) dot(px(state.fuse.x), pz(state.fuse.z), 3 + Math.sin(state.time * 6) * 1.5, '#f0a03c');
-    for (const a of state.agents) {
-      if (!a.alive) continue;
-      const x = px(a.pos.x), y = pz(a.pos.z);
-      if (a === state.player) {
-        rctx.save(); rctx.translate(x, y); rctx.rotate(-a.yaw);
-        rctx.fillStyle = '#e8e2d6';
-        rctx.beginPath(); rctx.moveTo(0, -6); rctx.lineTo(4, 5); rctx.lineTo(-4, 5); rctx.closePath(); rctx.fill();
-        rctx.restore();
-      } else if (a.team === state.player.team) dot(x, y, 3, '#f0a03c');
-      else if (state.time - state.spottedT[a.id] < 3) dot(x, y, 3, '#ff4444');
-      else continue;
-      if (a.hasFuse) { rctx.strokeStyle = '#f0a03c'; rctx.beginPath(); rctx.arc(x, y, a === state.player ? 7 : 6, 0, 7); rctx.stroke(); }
-    }
-  }
-  function buyHtml(state) {
-    const p = state.player;
-    let rows = '';
-    for (const [id, label, price, key] of BUY) {
-      const owned = WEAPONS[id] ? p.weapons.includes(id)
-        : ({ armor: p.armor >= 100, helm: p.helm, cutters: p.hasCutters })[id] ?? p.nades[id] >= GRENADES[id].max;
-      const teamOk = id !== 'cutters' || p.team === 'bastion';
-      const cls = !teamOk || p.money < price ? 'off' : owned ? 'owned' : '';
-      rows += `<div class="buy-row ${cls}" data-id="${id}"><span class="buy-key">${key || '·'}</span><span>${label}</span><span>$${price}</span><span>${owned ? 'OWNED' : ''}</span></div>`;
-    }
-    return `<h3>BUY — ROUND ${state.round}</h3><div class="buy-money">$${p.money} · B TO CLOSE</div>${rows}`;
-  }
-  const last = {};
-  function set(node, key, value) {
-    if (!node || last[key] === value) return;
-    last[key] = value;
-    node.textContent = value;
-  }
-  function tog(node, key, show) {
-    if (!node) return false;
-    if (last[key] !== show) { last[key] = show; node.style.display = show ? '' : 'none'; }
-    return show;
-  }
-  function setBar(node, key, pct) {
-    if (!node || last[key] === pct) return;
-    last[key] = pct;
-    node.style.width = `${pct}%`;
-  }
-  let lastKillCount = 0, hitT = -1, lastBoard = '';
-  return {
-    update(state, view) {
-      curState = state;
-      const p = state.player, v = view || p;
-      const w = activeWeapon(v), am = v.ammo[activeId(v)];
-      set(el.hp, 'hp', String(Math.max(0, Math.round(v.hp))));
-      setBar(el.hpBar, 'hpbar', Math.max(0, v.hp));
-      set(el.armor, 'armor', v.armor > 0 ? `ARMOR ${Math.round(v.armor)}${v.helm ? ' + HELM' : ''}` : '');
-      set(el.ammo, 'ammo', v.grenadeMode ? 'LMB THROW · RMB LOB' : w.cls === 'knife' ? '—' : `${am.mag} / ${am.reserve}`);
-      set(el.weapon, 'weapon', v.grenadeMode ? `${GRENADES[v.nadeSel].name} ×${v.nades[v.nadeSel]}` : w.name);
-      set(el.money, 'money', `$${p.money}`);
-      const t = Math.max(0, Math.ceil(state.roundT));
-      set(el.timer, 'timer', `${Math.floor(t / 60)}:${String(t % 60).padStart(2, '0')}`);
-      const tColor = state.phase === 'planted' ? '#f0a03c' : '';
-      if (el.timer && last.tColor !== tColor) { last.tColor = tColor; el.timer.style.color = tColor; }
-      set(el.score, 'score', `${state.score.strand} — ${state.score.bastion}`);
-      set(el.round, 'round', `ROUND ${state.round}`);
-      let aS = 0, aB = 0;
-      for (let i = 0; i < state.agents.length; i++) {
-        const a = state.agents[i];
-        if (a.alive) { if (a.team === 'strand') aS++; else aB++; }
-      }
-      set(el.pips, 'pips', `●`.repeat(aS) + `○`.repeat(5 - aS) + '  ' + `●`.repeat(aB) + `○`.repeat(5 - aB));
-      set(el.hint, 'hint', state.input.locked || state.autoplay ? '' : 'CLICK TO DEPLOY');
-      set(el.spec, 'spec', v !== p ? `SPECTATING ${v.name} — SPACE FOR NEXT` : '');
-      if (tog(el.banner, 'bannerShow', state.banner && state.time - state.banner.t < 4 && !state.buyOpen)) set(el.banner, 'banner', state.banner.text);
-      {
-        const planting = p.plantT > 0, defusing = p.defuseT > 0;
-        if (tog(el.progress, 'progShow', planting || defusing)) {
-          const pct = planting ? p.plantT / ROUND.plantTime : p.defuseT / (p.hasCutters ? ROUND.defuseCuttersTime : ROUND.defuseTime);
-          setBar(el.progBar, 'progbar', Math.round(pct * 100));
-          set(el.progLabel, 'proglabel', planting ? 'PLANTING THE FUSE — HOLD E' : 'DEFUSING — HOLD E');
-        }
-      }
-      if (tog(el.board, 'boardShow', state.input.scoreboard)) {
-        let rows = '';
-        for (let i = 0; i < state.agents.length; i++) {
-          const a = state.agents[i];
-          rows += `<div class="${a.alive ? '' : 'dead'}"><span>${a.name}</span><span>${a.kills} / ${a.deaths} / ${a.headshots}</span><span>$${a.money}</span><span>${a.alive ? 'ALIVE' : 'DEAD'}</span></div>`;
-        }
-        const html = `<h3>SALTLINE — BRINEHOLD</h3>${rows}`;
-        if (html !== lastBoard) { lastBoard = html; el.board.innerHTML = html; }
-      }
-      drawRadar(state);
-      if (tog(el.buy, 'buyShow', state.buyOpen)) {
-        const html = buyHtml(state);
-        if (html !== lastBuyHtml) { lastBuyHtml = html; el.buy.innerHTML = html; }
-      }
-      if (el.flash) {
-        const op = Math.round(Math.min(0.95, Math.max(0, p.flashT / 2.5)) * 20) / 20;
-        if (last.flashOp !== op) { last.flashOp = op; el.flash.style.opacity = String(op); }
-      }
-      const spread = computeSpread(v);
-      const gap = Math.round(4 + Math.tan(spread) * 360);
-      if (tog(el.cross, 'crossShow', !v.scoped && v.alive) && last.gap !== gap) {
-        last.gap = gap;
-        el.cross.style.setProperty('--gap', `${gap}px`);
-      }
-      if (el.scope) {
-        const show = v.scoped;
-        if (last.scopeShow !== show) { last.scopeShow = show; el.scope.style.display = show ? 'block' : 'none'; }
-      }
-      if (el.hitmark) {
-        if (v.lastHit && v.lastHit.t !== hitT) {
-          hitT = v.lastHit.t;
-          el.hitmark.style.display = '';
-          el.hitmark.style.borderColor = v.lastHit.head ? '#ff4444' : '#e8e2d6';
-          el.hitmark.dataset.t = String(performance.now());
-        } else if (hitT >= 0 && performance.now() - Number(el.hitmark.dataset.t || 0) > 250) {
-          el.hitmark.style.display = 'none';
-        }
-      }
-      if (el.killfeed && state.killfeed.length !== lastKillCount) {
-        lastKillCount = state.killfeed.length;
-        el.killfeed.innerHTML = state.killfeed.slice(-4).map((k) =>
-          `<div>${k.head ? '◎ ' : ''}${k.text}</div>`).join('');
-      }
-    },
-  };
+const PX = 2.6, S = 190, R = S / 2, AMBER = '#f0a03c', TEAL = '#3fb0a4', INK = 'rgba(236,230,218,', NADES = [['nS', 'shard'], ['nV', 'veil']];
+const HEAD = '<svg class="hs" viewBox="0 0 14 14"><circle cx="7" cy="7" r="5"/><path d="M7 0v4M7 10v4M0 7h4M10 7h4"/></svg>';
+
+export function createHud(map) {
+	const E = {}, last = {};
+	for (const e of document.querySelectorAll('#hud [id]')) E[e.id] = e;
+	const changed = (key, v) => { if (last[key] === v) return false; last[key] = v; return true; };
+	const text = (k, v) => { if (changed(k, v)) E[k].textContent = v; };
+	const html = (k, v) => { if (changed(k, v)) E[k].innerHTML = v; };
+	const show = (k, v) => { if (changed('s' + k, v)) E[k].hidden = !v; return v; };
+	const style = (k, prop, v) => { if (changed(k + prop, v)) E[k].style.setProperty(prop, v); };
+	const width = (k, v) => { if (changed('w' + k, v)) (E[k].firstChild || E[k]).style.width = `${v}%`; };
+	const cls = (k, c, on) => { if (changed(k + c, on)) E[k].classList.toggle(c, on); };
+
+	// Radar: the map drawn once, turned with the view; upright lane names, spotted enemies, the Fuse.
+	const B = map.bounds, X = (x) => (x - B.x0) * PX, Z = (z) => (z - B.z0) * PX, bg = document.createElement('canvas'), g = bg.getContext('2d'), rc = E.radar.getContext('2d');
+	bg.width = X(B.x1); bg.height = Z(B.z1);
+	g.fillStyle = 'rgba(40,44,48,.6)'; g.fillRect(0, 0, bg.width, bg.height); g.strokeStyle = INK + '.9)';
+	for (const b of map.boxes) if (b[4] > .4 && b[6] !== 12) {
+		const tall = b[4] > 2.5, w = (b[3] - b[0]) * PX, h = (b[5] - b[2]) * PX;
+		g.fillStyle = tall ? 'rgba(170,166,158,.8)' : INK + '.28)'; g.fillRect(X(b[0]), Z(b[2]), w, h);
+		if (tall) g.strokeRect(X(b[0]) + .5, Z(b[2]) + .5, w - 1, h - 1);
+	}
+	Object.assign(g, { font: 'bold 22px sans-serif', textAlign: 'center', textBaseline: 'middle', strokeStyle: AMBER, fillStyle: AMBER, lineWidth: 2 }); g.setLineDash([5, 4]);
+	for (const [z, l] of [[map.zones.sitePans, 'A'], [map.zones.siteBoiler, 'B']]) { g.beginPath(); g.arc(X(z.cx), Z(z.cz), z.r * PX, 0, 7); g.stroke(); g.fillText(l, X(z.cx), Z(z.cz)); }
+	rc.textAlign = 'center';
+	const shape = (c, ...p) => { rc.fillStyle = c; rc.beginPath(); for (let i = 0; i < p.length; i += 2) rc.lineTo(p[i], p[i + 1]); rc.fill(); };
+	const ring = (x, z, r, fill) => { rc.beginPath(); rc.arc(x, z, r, 0, 7); if (fill) { rc.fillStyle = fill; rc.fill(); } else rc.stroke(); };
+	function drawRadar(state, v) {
+		rc.clearRect(0, 0, S, S);
+		rc.save(); rc.translate(R, R); rc.rotate(v.yaw); rc.translate(-X(v.pos.x), -Z(v.pos.z));
+		rc.drawImage(bg, 0, 0);
+		rc.font = '600 9px sans-serif'; rc.fillStyle = INK + '.8)'; rc.strokeStyle = '#fff'; rc.lineWidth = 1.5;
+		for (const [t, x, z] of map.callouts) { rc.save(); rc.translate(X(x), Z(z)); rc.rotate(-v.yaw); rc.fillText(t, 0, 0); rc.restore(); }
+		const f = state.fuse;
+		if (f.planted || f.dropped) ring(X(f.x), Z(f.z), 5 + Math.sin(state.time * 8) * 2, AMBER);
+		for (const a of state.agents) {
+			const x = X(a.pos.x), z = Z(a.pos.z);
+			if (!a.alive || a === v) continue;
+			if (a.team === v.team) { ring(x, z, 4, a.team === 'strand' ? AMBER : TEAL); if (a.hasFuse) ring(x, z, 7); }
+			else if (state.time - state.spottedT[a.id] < 2.5) shape('#ff5a4a', x, z - 6, x + 5, z, x, z + 6, x - 5, z);
+		}
+		rc.restore();
+		shape('#fff', R, R - 8, R + 5.5, R + 6, R, R + 2.5, R - 5.5, R + 6);
+	}
+	const card = (p, [id, key, note]) => {
+		const own = owns(p, id), off = p.money < priceOf(id) || (id === 'cutters' && p.team !== 'bastion');
+		return `<div class="it ${own ? 'own' : off ? 'off' : ''}" data-id="${id}"><kbd>${key}</kbd><b>${nameOf(id)}</b><s>${own ? 'OWNED' : '$' + priceOf(id)}</s><small>${note}</small></div>`;
+	};
+	const buyMenu = (state, p = state.player) => `<header><h3>REQUISITION</h3><span class="lbl">${Math.max(0, Math.ceil(state.roundT))} S · B CLOSES · KEYS OR CLICK</span><span class="cr">$${p.money}</span></header>`
+		+ `<div class="cols">${BUY.map(([title, items]) => `<div><p class="lbl">${title}</p>${items.map((it) => card(p, it)).join('')}</div>`).join('')}</div>`;
+	let st = null;
+	E.buy.addEventListener('mousedown', (e) => { const it = e.target.closest('[data-id]'); if (it && st?.buyOpen) buyItem(st, st.player, it.dataset.id); });
+	const team = (state, t, row) => state.agents.filter((a) => a.team === t).map(row).join('');
+	const board = (state) => `<table><tr><th>BRINEHOLD · ROUND ${state.round}</th><th>K</th><th>D</th><th>HS</th><th>CREDITS</th></tr>${['strand', 'bastion'].map((t) => `<tr class="t"><td colspan="5" class="${t}">${t.toUpperCase()} · ${state.score[t]}</td></tr>`
+		+ team(state, t, (a) => `<tr class="${a.alive ? '' : 'dead'} ${a.isBot ? '' : 'me'}"><td>${a.name}</td><td>${a.kills}</td><td>${a.deaths}</td><td>${a.kills ? Math.round(a.headshots / a.kills * 100) : 0}%</td><td>$${a.money}</td></tr>`)).join('')}</table>`;
+	const pip = (a) => `<i class="${a.alive ? '' : 'd'}"></i>`;
+	const feedRow = (k) => (k.text ? `<div class="r">${k.text}</div>` : `<div class="${k.a === 'You' || k.b === 'You' ? 'k' : ''}">${k.a}<em>${k.w}</em>${k.b}${k.head ? HEAD : ''}</div>`);
+	return {
+		update(state, v) {
+			st = state;
+			const w = activeWeapon(v), am = v.ammo[activeId(v)], nade = v.grenadeMode, f = state.fuse, t = Math.max(0, Math.ceil(state.roundT)), phase = state.phase;
+			text('hp', Math.ceil(v.hp)); width('hpbar', Math.ceil(v.hp)); cls('hpbar', 'low', v.hp <= 30);
+			text('ar', Math.round(v.armor)); width('arm', Math.round(v.armor)); text('helm', v.helm ? 'HELM' : '');
+			text('cash', `$${v.money}`);
+			const mags = nade ? -1 : Math.ceil(am.reserve / w.mag);
+			html('ammo', nade ? `${v.nades[v.nadeSel]}<small>LMB THROW · RMB LOB</small>` : `${am.mag}<small>/ ${w.mag}</small>`);
+			if (changed('mags', mags)) E.mags.innerHTML = mags < 0 ? '' : `<span>×${mags}</span><b>${'<i></i>'.repeat(Math.min(mags, 8))}</b>`;
+			cls('ammo', 'low', !nade && am.mag <= Math.ceil(w.mag / 5));
+			text('wname', nade ? GRENADES[v.nadeSel].name : `${w.name}${v.reloadT > 0 ? ' · RELOADING' : ''}`);
+			for (const [k, id] of NADES) { text(k, `${GRENADES[id].name}${v.nades[id] > 1 ? ' ×' + v.nades[id] : ''}`); cls(k, 'on', v.nades[id] > 0); cls(k, 'sel', nade && v.nadeSel === id); }
+			text('kit', v.hasFuse ? 'FUSE' : v.hasCutters ? 'CUTTERS' : '');
+			text('timer', `${Math.floor(t / 60)}:${String(t % 60).padStart(2, '0')}`); cls('timer', 'hot', phase === 'planted' || (phase === 'live' && t <= 10));
+			text('rnd', phase === 'planted' ? 'FUSE PLANTED' : `ROUND ${state.round}${phase === 'buy' ? ' · BUY' : ''}`);
+			text('scS', state.score.strand); text('scB', state.score.bastion);
+			let mask = 0;
+			for (let i = 0; i < state.agents.length; i++) mask |= state.agents[i].alive << i;
+			if (changed('mask', mask)) { E.pipS.innerHTML = team(state, 'strand', pip); E.pipB.innerHTML = team(state, 'bastion', pip); }
+			const kf = state.killfeed;
+			if (changed('feed', kf[kf.length - 1]?.t)) E.feed.innerHTML = kf.map(feedRow).join('');
+			const bn = state.banner;
+			if (show('banner', !!bn && state.time - bn.t < (bn.text === 'GO' ? 1.2 : 3.5) && !state.buyOpen)) { text('bT', bn.text); text('bS', bn.sub); }
+			if (show('prog', v.plantT > 0 || v.defuseT > 0)) {
+				text('progL', v.plantT > 0 ? 'PLANTING THE FUSE' : 'CUTTING THE FUSE');
+				width('progB', Math.round(100 * (v.plantT > 0 ? v.plantT / ROUND.plantTime : v.defuseT / (v.hasCutters ? ROUND.defuseCuttersTime : ROUND.defuseTime))));
+			}
+			const nearFuse = f.planted && v.team === 'bastion' && Math.hypot(v.pos.x - f.x, v.pos.z - f.z) < 1.6;
+			text('prompt', v.plantT > 0 || v.defuseT > 0 ? '' : v.hasFuse && phase === 'live' && siteAt(state, v.pos.x, v.pos.z) ? 'HOLD E TO PLANT THE FUSE'
+				: nearFuse ? 'HOLD E TO CUT THE FUSE' : !state.input.locked && !state.autoplay && !state.scenarioDone ? 'CLICK TO AIM' : '');
+			drawRadar(state, v);
+			const slow = Math.floor(state.time * 5);
+			if (show('buy', state.buyOpen) && (slow !== last.slow || v.money !== last.buyMoney)) { last.buyMoney = v.money; E.buy.innerHTML = buyMenu(state); }
+			if (show('board', state.input.scoreboard || phase === 'matchEnd') && slow !== last.slow) E.board.innerHTML = board(state);
+			last.slow = slow;
+			style('cross', '--g', `${Math.round(3 + Math.tan(computeSpread(v)) * innerHeight * .75)}px`); show('cross', !v.scoped && v.alive && !state.buyOpen);
+			show('scope', v.scoped && activeId(v) === 'longbow');
+			cls('hit', 'on', state.time - v.lastHit.t < .12); cls('hit', 'hs', v.lastHit.head);
+			const hurt = Math.max(0, 1 - (state.time - v.hurtT) / .8), low = v.alive && v.hp <= 30;
+			style('vig', 'opacity', Math.min(1, hurt * .8 + (low ? .55 : 0)).toFixed(2)); cls('vig', 'low', low);
+		},
+	};
 }

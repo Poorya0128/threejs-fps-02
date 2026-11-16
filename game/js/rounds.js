@@ -1,167 +1,87 @@
-// SALTLINE rounds.js — phase machine, win checks, plant/defuse, side swap,
-import { ROUND, ECON } from './config.js';
+// Round phases, win checks, the Fuse (carried, dropped, planted, cut) and the half-time swap.
+import { ROUND, ECON, WEAPONS } from './config.js';
 import { awardRoundMoney } from './economy.js';
-import { resetAgentsForRound, pushNoise } from './state.js';
+import { pushNoise, feed, teamName } from './state.js';
+import { giveWeapon } from './weapons.js';
 
-export function banner(state, text) { state.banner = { text, t: state.time }; }
+const SPAWN_OFF = [[0, 0], [-1.5, 2], [-1.5, -2], [1.5, 2.5], [1.5, -2.5]], REASON = {
+	elimination: (w) => `${w.toUpperCase()} CLEARS THE FIELD`, time: () => 'BASTION HOLDS THE LINE', detonation: () => 'THE FUSE DETONATES', defuse: () => 'FUSE CUT — BASTION WINS',
+};
+const banner = (state, text, sub = '') => { state.banner = { text, sub, t: state.time }; };
+const still = (a) => a.alive && Math.hypot(a.vel.x, a.vel.z) <= 1.2;
+const near = (a, x, z, r) => Math.hypot(a.pos.x - x, a.pos.z - z) < r;
+function alive(state, team) { let n = 0; for (const a of state.agents) n += a.alive && a.team === team; return n; }
 
-function aliveCount(state, team) {
-  let n = 0;
-  for (const a of state.agents) if (a.alive && a.team === team) n++;
-  return n;
-}
-
-function placeAgents(state) {
-  const s = state.map.spawns;
-  const off = [[0, 0], [-2, 1.5], [2, 1.5], [-2, -1.5], [2, -1.5]];
-  let si = 0, bi = 0;
-  for (const a of state.agents) {
-    const o = a.team === 'strand' ? off[si++ % 5] : off[bi++ % 5];
-    const sp = a.team === 'strand' ? s.strand : s.bastion;
-    a.pos.set(sp[0] + o[0], 0, sp[1] + o[1]);
-    a.prevPos.copy(a.pos);
-    a.vel.set(0, 0, 0);
-    a.yaw = a.team === 'strand' ? 0 : Math.PI;
-    a.pitch = 0; a.crouch = 0; a.flashT = 0;
-  }
+export function siteAt(state, x, z) {
+	const { sitePans: p, siteBoiler: b } = state.zones;
+	return Math.hypot(x - p.cx, z - p.cz) < p.r ? 'pans' : Math.hypot(x - b.cx, z - b.cz) < b.r ? 'boiler' : null;
 }
 
 export function startRound(state) {
-  resetAgentsForRound(state);
-  placeAgents(state);
-  if (state.round === ROUND.swapAfter + 1 && !state.swapped) {
-    state.swapped = true;
-    for (const a of state.agents) a.team = a.team === 'strand' ? 'bastion' : 'strand';
-    for (const a of state.agents) a.money = ECON.start;
-    state.lossStreak = { strand: 0, bastion: 0 };
-    placeAgents(state);
-  }
-  const carriers = state.agents.filter((a) => a.team === 'strand' && a.isBot && a.alive);
-  const carrier = carriers[Math.floor(state.rng() * carriers.length)] || null;
-  for (const a of state.agents) a.hasFuse = false;
-  if (carrier) carrier.hasFuse = true;
-  state.fuse = { carrier, site: null, planted: false, x: 0, z: 0, t: 0 };
-  state.phase = 'buy';
-  state.roundT = ROUND.buyTime;
-  state.spectateIdx = -1;
-  state.newRound = true;
-  banner(state, `ROUND ${state.round} — BUY PHASE`);
+	if (state.round === ROUND.swapAfter + 1 && !state.swapped) { // half time: sides swap, money resets
+		state.swapped = true;
+		for (const a of state.agents) { a.team = a.team === 'strand' ? 'bastion' : 'strand'; a.money = ECON.start; a.alive = false; if (a.isBot) a.name = `${teamName(a.team)}-${a.id}`; }
+		[state.score.strand, state.score.bastion] = [state.score.bastion, state.score.strand];
+		state.lossStreak.strand = state.lossStreak.bastion = 0;
+		feed(state, 'Half time: teams swap sides');
+	}
+	const n = { strand: 0, bastion: 0 }, strand = state.agents.filter((a) => a.team === 'strand');
+	for (const a of state.agents) {
+		const sp = state.map.spawns[a.team], o = SPAWN_OFF[n[a.team]++ % 5], s = a.team === 'strand' ? 1 : -1;
+		if (!a.alive) { a.weapons.length = a.armor = 0; a.helm = a.hasCutters = false; a.nades.shard = a.nades.veil = 0; giveWeapon(a, 'wren'); }
+		a.pos.set(sp[0] + o[0] * s, 0, sp[1] + o[1]); a.prevPos.copy(a.pos); a.vel.set(0, 0, 0); a.recoil.pitch = a.recoil.yaw = 0;
+		Object.assign(a, { yaw: -s * Math.PI / 2, pitch: 0, alive: true, hp: 100, roundKills: 0, crouch: 0, plantT: 0, defuseT: 0, spreadBloom: 0,
+			shotsFired: 0, reloadT: 0, scoped: false, scopeLevel: 0, grenadeMode: false, hasFuse: false, active: a.weapons[0] ? 0 : 1 });
+		for (const id of a.weapons) if (id) a.ammo[id] = { mag: WEAPONS[id].mag, reserve: WEAPONS[id].reserve };
+	}
+	const carrier = strand[Math.floor(state.rng() * strand.length)];
+	carrier.hasFuse = true;
+	Object.assign(state.fuse, { carrier, site: null, planted: false, dropped: false });
+	Object.assign(state, { phase: 'buy', roundT: ROUND.buyTime, newRound: true, buyOpen: !state.autoplay });
+	banner(state, `ROUND ${state.round}`, 'BUY PHASE — B TO TOGGLE THE MENU');
 }
 
-export function endRound(state, winner, reason) {
-  awardRoundMoney(state, winner, reason);
-  state.score[winner]++;
-  state.roundsPlayed++;
-  state.lastWinReason = reason;
-  const names = {
-    elimination: winner === 'strand' ? 'Strand clears Bastion' : 'Bastion clears Strand',
-    time: 'Bastion holds the line',
-    detonation: 'Fuse detonates — Strand takes the round',
-    defuse: 'Fuse defused — Bastion takes the round',
-  };
-  banner(state, names[reason] || `${winner} wins the round`);
-  state.phase = 'post';
-  state.roundT = ROUND.postTime;
-}
-
-function checkElimination(state) {
-  const s = aliveCount(state, 'strand'), b = aliveCount(state, 'bastion');
-  if (state.phase === 'live') {
-    if (b === 0 && s > 0) endRound(state, 'strand', 'elimination');
-    else if (s === 0 && b > 0) endRound(state, 'bastion', 'elimination');
-  } else if (state.phase === 'planted') {
-    if (s === 0 && b === 0) endRound(state, 'strand', 'detonation');
-  }
+function endRound(state, winner, reason) {
+	awardRoundMoney(state, winner, reason);
+	state.score[winner]++; state.roundsPlayed++; state.lastWinReason = reason;
+	banner(state, REASON[reason](winner), `${winner.toUpperCase()} TAKES ROUND ${state.round}`);
+	Object.assign(state, { phase: 'post', roundT: ROUND.postTime, buyOpen: false });
 }
 
 export function updateRounds(state, dt) {
-  if (state.matchOver) return;
-  state.roundT -= dt;
-  if (state.phase === 'buy') {
-    if (state.roundT <= 0) { state.phase = 'live'; state.roundT = ROUND.liveTime; }
-    return;
-  }
-  if (state.phase === 'live') {
-    checkElimination(state);
-    if (state.phase !== 'live') return;
-    if (state.roundT <= 0) endRound(state, 'bastion', 'time');
-    return;
-  }
-  if (state.phase === 'planted') {
-    checkElimination(state);
-    if (state.phase !== 'planted') return;
-    if (state.roundT <= 0) endRound(state, 'strand', 'detonation');
-    return;
-  }
-  if (state.phase === 'post') {
-    if (state.roundT <= 0) {
-      if (state.score.strand >= ROUND.winRounds || state.score.bastion >= ROUND.winRounds) {
-        state.matchOver = true;
-        state.phase = 'matchEnd';
-        banner(state, state.score.strand > state.score.bastion ? 'STRAND WINS THE MATCH' : 'BASTION WINS THE MATCH');
-      } else {
-        state.round++;
-        startRound(state);
-      }
-    }
-  }
+	if (state.matchOver) return;
+	const f = state.fuse, s = alive(state, 'strand'), b = alive(state, 'bastion'), over = (state.roundT -= dt) <= 0;
+	if (state.phase === 'buy' && over) { Object.assign(state, { phase: 'live', roundT: ROUND.liveTime, buyOpen: false }); banner(state, 'GO'); }
+	else if (state.phase === 'live') {
+		if (f.carrier && !f.carrier.alive) { Object.assign(f, { dropped: true, x: f.carrier.pos.x, z: f.carrier.pos.z, carrier: null }); feed(state, 'The Fuse is down'); }
+		for (const a of state.agents) if (f.dropped && a.alive && a.team === 'strand' && near(a, f.x, f.z, 1.1)) { f.dropped = false; f.carrier = a; a.hasFuse = true; }
+		if (!b) endRound(state, 'strand', 'elimination'); else if (!s) endRound(state, 'bastion', 'elimination'); else if (over) endRound(state, 'bastion', 'time');
+	} else if (state.phase === 'planted') { if (!b) endRound(state, 'strand', 'elimination'); else if (over) endRound(state, 'strand', 'detonation'); }
+	else if (state.phase === 'post' && over) {
+		const { strand, bastion } = state.score;
+		if (Math.max(strand, bastion) < ROUND.winRounds) { state.round++; startRound(state); return; }
+		Object.assign(state, { matchOver: true, phase: 'matchEnd' });
+		banner(state, `${strand > bastion ? 'STRAND' : 'BASTION'} WINS THE MATCH`, `${strand} — ${bastion}`);
+	}
 }
 
 export function plantCharge(state, a, dt) {
-  if (!a.hasFuse || state.phase !== 'live' || !a.alive) { a.plantT = 0; return 0; }
-  const z = state.zones;
-  const inPans = Math.hypot(a.pos.x - z.sitePans.cx, a.pos.z - z.sitePans.cz) < z.sitePans.r;
-  const inBoiler = Math.hypot(a.pos.x - z.siteBoiler.cx, a.pos.z - z.siteBoiler.cz) < z.siteBoiler.r;
-  const site = inPans ? 'pans' : inBoiler ? 'boiler' : null;
-  if (!site) { a.plantT = 0; return 0; }
-  a.plantT += dt;
-  if (a.plantT >= ROUND.plantTime) {
-    a.plantT = 0;
-    state.fuse.planted = true;
-    state.fuse.site = site;
-    state.fuse.x = a.pos.x; state.fuse.z = a.pos.z;
-    state.fuse.t = ROUND.fuseTime;
-    state.phase = 'planted';
-    state.roundT = ROUND.fuseTime;
-    a.money = Math.min(ECON.cap, a.money + ECON.plant);
-    pushNoise(state, a.pos.x, a.pos.y, a.pos.z, 60, a.team);
-    banner(state, `FUSE PLANTED AT ${site === 'pans' ? 'PANS' : 'BOILER'}`);
-    state.killfeed.push({ text: `${a.name} planted the Fuse`, head: false, t: state.time });
-  }
-  return Math.min(1, a.plantT / ROUND.plantTime);
+	const site = siteAt(state, a.pos.x, a.pos.z);
+	if (!a.hasFuse || state.phase !== 'live' || !site || !still(a)) { a.plantT = 0; return; }
+	if (a.plantT === 0) pushNoise(state, a.pos.x, a.pos.y, a.pos.z, 18, a.team, 2);
+	if ((a.plantT += dt) < ROUND.plantTime) return;
+	a.plantT = 0; a.hasFuse = false; a.money = Math.min(ECON.cap, a.money + ECON.plant);
+	Object.assign(state.fuse, { planted: true, site, x: a.pos.x, z: a.pos.z, carrier: null });
+	Object.assign(state, { phase: 'planted', roundT: ROUND.fuseTime });
+	pushNoise(state, a.pos.x, a.pos.y, a.pos.z, 70, a.team, 2);
+	banner(state, `FUSE PLANTED AT ${site.toUpperCase()}`, `${ROUND.fuseTime} SECONDS`);
+	feed(state, `${a.name} planted the Fuse at ${site === 'pans' ? 'Pans' : 'Boiler'}`);
 }
 
 export function defuseCharge(state, a, dt) {
-  if (!state.fuse || !state.fuse.planted || a.team !== 'bastion' || !a.alive) { a.defuseT = 0; return 0; }
-  const d = Math.hypot(a.pos.x - state.fuse.x, a.pos.z - state.fuse.z);
-  if (d > 2.2) { a.defuseT = 0; return 0; }
-  const need = a.hasCutters ? ROUND.defuseCuttersTime : ROUND.defuseTime;
-  a.defuseT += dt;
-  if (a.defuseT >= need * 0.5 && a.defuseT - dt < need * 0.5) {
-    pushNoise(state, a.pos.x, a.pos.y, a.pos.z, 25, a.team);
-  }
-  if (a.defuseT >= need) {
-    a.defuseT = 0;
-    state.fuse.planted = false;
-    endRound(state, 'bastion', 'defuse');
-  }
-  return Math.min(1, a.defuseT / need);
-}
-
-function livingMates(state) {
-  return state.agents.filter((a) => a.alive && a.team === state.player.team && a !== state.player);
-}
-
-export function spectateTarget(state) {
-  const p = state.player;
-  if (p.alive) return null;
-  const mates = livingMates(state);
-  if (!mates.length) return null;
-  if (state.spectateIdx < 0 || state.spectateIdx >= mates.length) state.spectateIdx = 0;
-  return mates[state.spectateIdx];
-}
-
-export function cycleSpectate(state) {
-  const mates = livingMates(state);
-  if (mates.length) state.spectateIdx = (state.spectateIdx + 1) % mates.length;
+	const f = state.fuse;
+	if (state.phase !== 'planted' || a.team !== 'bastion' || !near(a, f.x, f.z, 1.6) || !still(a)) { a.defuseT = 0; return; }
+	if (a.defuseT === 0) pushNoise(state, a.pos.x, a.pos.y, a.pos.z, 26, a.team, 2);
+	if ((a.defuseT += dt) < (a.hasCutters ? ROUND.defuseCuttersTime : ROUND.defuseTime)) return;
+	a.defuseT = 0; f.planted = false; feed(state, `${a.name} cut the Fuse`); endRound(state, 'bastion', 'defuse');
 }

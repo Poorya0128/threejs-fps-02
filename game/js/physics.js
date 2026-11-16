@@ -1,161 +1,78 @@
-// SALTLINE physics.js — Quake-style ground model, capsule vs AABB
-import * as THREE from 'three';
+// Shared movement: Quake-style friction and acceleration, gravity, crouch, capsule vs boxes with step-up.
 import { MOVE } from './config.js';
 import { clamp } from './math.js';
 import { pushNoise } from './state.js';
 
-const _wish = new THREE.Vector3();
-
-export function applyFriction(a, dt) {
-  const vx = a.vel.x, vz = a.vel.z;
-  const speed = Math.hypot(vx, vz);
-  if (speed < 0.05) { a.vel.x = 0; a.vel.z = 0; return; }
-  const control = Math.max(speed, MOVE.stopSpeed);
-  const drop = control * MOVE.friction * dt;
-  const ns = Math.max(0, speed - drop) / speed;
-  a.vel.x *= ns; a.vel.z *= ns;
+const heightAt = (c) => MOVE.heightStand + (MOVE.heightCrouch - MOVE.heightStand) * c;
+const overXZ = (p, b, r) => p.x + r > b.min.x && p.x - r < b.max.x && p.z + r > b.min.z && p.z - r < b.max.z;
+function headClear(state, p, h) {
+	for (const b of state.boxes) if (overXZ(p, b, MOVE.radius) && p.y + h > b.min.y && p.y < b.max.y) return false;
+	return true;
 }
 
-export function accelerate(a, wx, wz, wishSpeed, accel, dt) {
-  const cur = a.vel.x * wx + a.vel.z * wz;
-  const add = wishSpeed - cur;
-  if (add <= 0) return;
-  const acc = Math.min(accel * wishSpeed * dt, add);
-  a.vel.x += wx * acc; a.vel.z += wz * acc;
+export function setCrouch(state, a, want, dt) {
+	const c = a.crouch + (want ? 1 : -1) * dt / MOVE.crouchTime;
+	if (want || (a.crouch > 0 && headClear(state, a.pos, heightAt(c) + .02))) a.crouch = clamp(c, 0, 1);
+	a.eyeHeight = MOVE.eyeStand + (MOVE.eyeCrouch - MOVE.eyeStand) * a.crouch;
 }
 
-export function setCrouch(state, a, wantCrouch, dt) {
-  const target = wantCrouch ? 1 : 0;
-  const rate = dt / MOVE.crouchTime;
-  if (target < a.crouch) {
-    const h = heightAt(a.crouch);
-    const standH = MOVE.heightStand;
-    if (headClear(state, a, standH)) a.crouch = Math.max(0, a.crouch - rate);
-    else a.crouch = Math.min(a.crouch, crouchForHeight(state, a, h));
-  } else {
-    a.crouch = Math.min(1, a.crouch + rate);
-  }
-  a.eyeHeight = MOVE.eyeStand + (MOVE.eyeCrouch - MOVE.eyeStand) * a.crouch;
+export function stepAgent(state, a, wx, wz, wish, jump, dt) {
+	const v = a.vel;
+	let speed = Math.hypot(v.x, v.z);
+	if (a.onGround) {
+		const k = speed < .05 ? 0 : Math.max(0, speed - Math.max(speed, MOVE.stopSpeed) * MOVE.friction * dt) / speed;
+		v.x *= k; v.z *= k;
+	}
+	const add = Math.min(wish - (v.x * wx + v.z * wz), (a.onGround ? MOVE.accelGround : MOVE.accelAir) * wish * dt);
+	if (add > 0) { v.x += wx * add; v.z += wz * add; }
+	if (jump && a.onGround && a.crouch < .5) { v.y = MOVE.jumpVel; a.onGround = false; }
+	v.y = Math.max(-22, v.y - MOVE.gravity * dt);
+	a.prevPos.copy(a.pos);
+	a.pos.x += v.x * dt; a.pos.z += v.z * dt;
+	collideHorizontal(state, a);
+	const fall = v.y;
+	a.pos.y += v.y * dt;
+	collideVertical(state, a);
+	speed = a.speed = Math.hypot(v.x, v.z);
+	a.walkPhase += speed * dt * 2.3; a.stepAcc += speed * dt;
+	if (a.onGround && a.crouch < .5 && wish > 0 && speed > Math.max(3, wish * .6) && a.stepAcc >= MOVE.stepStride) { a.stepAcc = 0; pushNoise(state, a.pos.x, a.pos.y, a.pos.z, 14, a.team); }
+	else if (a.onGround && fall < -4.8) pushNoise(state, a.pos.x, a.pos.y, a.pos.z, 12, a.team);
 }
 
-function heightAt(crouch) {
-  return MOVE.heightStand + (MOVE.heightCrouch - MOVE.heightStand) * crouch;
-}
-
-function crouchForHeight(state, a, h) {
-  for (let c = a.crouch; c <= 1.0001; c += 0.05) {
-    if (!headClear(state, a, heightAt(c))) return Math.max(0, c - 0.05);
-  }
-  return 1;
-}
-
-function headClear(state, a, h) {
-  const r = MOVE.radius, x = a.pos.x, z = a.pos.z;
-  const minY = a.pos.y, maxY = a.pos.y + h;
-  for (let i = 0; i < state.boxes.length; i++) {
-    const b = state.boxes[i];
-    if (x + r <= b.min.x || x - r >= b.max.x) continue;
-    if (z + r <= b.min.z || z - r >= b.max.z) continue;
-    if (maxY <= b.min.y || minY >= b.max.y) continue;
-    return false;
-  }
-  return true;
-}
-
-export function stepAgent(state, a, wishX, wishZ, wishSpeed, jump, dt) {
-  if (a.onGround) {
-    applyFriction(a, dt);
-    accelerate(a, wishX, wishZ, wishSpeed, MOVE.accelGround, dt);
-  } else {
-    accelerate(a, wishX, wishZ, wishSpeed, MOVE.accelAir, dt);
-  }
-  if (jump && a.onGround) { a.vel.y = MOVE.jumpVel; a.onGround = false; }
-  a.vel.y -= MOVE.gravity * dt;
-  if (a.vel.y < -22) a.vel.y = -22;
-
-  a.prevPos.copy(a.pos);
-  a.pos.x += a.vel.x * dt;
-  a.pos.z += a.vel.z * dt;
-  collideHorizontal(state, a);
-  const fallV = a.vel.y;
-  a.pos.y += a.vel.y * dt;
-  collideVertical(state, a);
-  const speed2 = Math.hypot(a.vel.x, a.vel.z);
-  a.stepAcc += speed2 * dt;
-  if (a.onGround && a.crouch < 0.5 && wishSpeed > 0 && speed2 > wishSpeed * 0.6 && a.stepAcc >= MOVE.stepNoiseStride) {
-    a.stepAcc = 0;
-    pushNoise(state, a.pos.x, a.pos.y, a.pos.z, 12, a.team);
-  } else if (a.onGround && fallV < -MOVE.landNoiseMinFall) {
-    pushNoise(state, a.pos.x, a.pos.y, a.pos.z, 12, a.team);
-  }
-}
-
+// Up to 3 passes out of overlapping boxes, sliding along them; low boxes are stepped onto.
 function collideHorizontal(state, a) {
-  const r = MOVE.radius, h = heightAt(a.crouch);
-  for (let iter = 0; iter < 3; iter++) {
-    let pushed = false;
-    for (let i = 0; i < state.boxes.length; i++) {
-      const b = state.boxes[i];
-      if (a.pos.y + h <= b.min.y + 0.001 || a.pos.y >= b.max.y - 0.001) continue;
-      const cx = clamp(a.pos.x, b.min.x, b.max.x);
-      const cz = clamp(a.pos.z, b.min.z, b.max.z);
-      const dx = a.pos.x - cx, dz = a.pos.z - cz;
-      const d2 = dx * dx + dz * dz;
-      if (d2 >= r * r) continue;
-      if (d2 < 1e-8) {
-        const pl = a.pos.x - b.min.x, pr = b.max.x - a.pos.x;
-        const pb = a.pos.z - b.min.z, pf = b.max.z - a.pos.z;
-        const m = Math.min(pl, pr, pb, pf);
-        if (m === pl) a.pos.x = b.min.x - r;
-        else if (m === pr) a.pos.x = b.max.x + r;
-        else if (m === pb) a.pos.z = b.min.z - r;
-        else a.pos.z = b.max.z + r;
-        pushed = true; continue;
-      }
-      const d = Math.sqrt(d2);
-      if (a.onGround && b.max.y - a.pos.y <= MOVE.stepUp && b.max.y > a.pos.y) {
-        a.pos.y = b.max.y; a.vel.y = 0; a.onGround = true; pushed = true; continue;
-      }
-      const push = (r - d) / d;
-      a.pos.x += dx * push; a.pos.z += dz * push;
-      const nx = dx / d, nz = dz / d;
-      const vn = a.vel.x * nx + a.vel.z * nz;
-      if (vn < 0) { a.vel.x -= vn * nx; a.vel.z -= vn * nz; }
-      pushed = true;
-    }
-    if (!pushed) break;
-  }
+	const r = MOVE.radius, h = heightAt(a.crouch), p = a.pos, v = a.vel;
+	for (let pass = 0, hit = true; pass < 3 && hit; pass++) {
+		hit = false;
+		for (const b of state.boxes) {
+			if (p.y + h <= b.min.y + .001 || p.y >= b.max.y - .001) continue;
+			const dx = p.x - clamp(p.x, b.min.x, b.max.x), dz = p.z - clamp(p.z, b.min.z, b.max.z), d2 = dx * dx + dz * dz;
+			if (d2 >= r * r) continue;
+			hit = true;
+			if (a.onGround && b.max.y - p.y <= MOVE.stepUp) { p.y = b.max.y; v.y = 0; }
+			else if (d2 < 1e-8) {
+				const l = p.x - b.min.x, rt = b.max.x - p.x, n = p.z - b.min.z, s = b.max.z - p.z, m = Math.min(l, rt, n, s);
+				if (m === l) p.x = b.min.x - r; else if (m === rt) p.x = b.max.x + r; else if (m === n) p.z = b.min.z - r; else p.z = b.max.z + r;
+			} else {
+				const d = Math.sqrt(d2), nx = dx / d, nz = dz / d, vn = Math.min(0, v.x * nx + v.z * nz);
+				p.x += nx * (r - d); p.z += nz * (r - d); v.x -= vn * nx; v.z -= vn * nz;
+			}
+		}
+	}
 }
-
 function collideVertical(state, a) {
-  const r = MOVE.radius, h = heightAt(a.crouch);
-  let grounded = false;
-  for (let i = 0; i < state.boxes.length; i++) {
-    const b = state.boxes[i];
-    if (a.pos.x + r <= b.min.x || a.pos.x - r >= b.max.x) continue;
-    if (a.pos.z + r <= b.min.z || a.pos.z - r >= b.max.z) continue;
-    if (a.vel.y <= 0 && a.prevPos.y >= b.max.y - 0.001 && a.pos.y <= b.max.y) {
-      a.pos.y = b.max.y; a.vel.y = 0; grounded = true;
-    }
-    else if (a.vel.y > 0 && a.prevPos.y + h <= b.min.y + 0.001 && a.pos.y + h >= b.min.y) {
-      a.pos.y = b.min.y - h; a.vel.y = 0;
-    }
-  }
-  if (a.pos.y <= 0) {
-    a.pos.y = 0; a.vel.y = 0; grounded = true;
-  }
-  a.onGround = grounded;
+	const h = heightAt(a.crouch), p = a.pos, v = a.vel;
+	a.onGround = p.y <= 0;
+	if (a.onGround) p.y = v.y = 0;
+	for (const b of state.boxes) {
+		if (!overXZ(p, b, MOVE.radius)) continue;
+		if (v.y <= 0 && a.prevPos.y >= b.max.y - .001 && p.y <= b.max.y) { p.y = b.max.y; v.y = 0; a.onGround = true; }
+		else if (v.y > 0 && a.prevPos.y + h <= b.min.y + .001 && p.y + h >= b.min.y) { p.y = b.min.y - h; v.y = 0; }
+	}
 }
 
 export function wishDir(yaw, f, b, l, r, out) {
-  const sy = Math.sin(yaw), cy = Math.cos(yaw);
-  let x = 0, z = 0;
-  if (f) { x += -sy; z += -cy; }
-  if (b) { x += sy; z += cy; }
-  if (l) { x += -cy; z += sy; }
-  if (r) { x += cy; z += -sy; }
-  const len = Math.hypot(x, z);
-  if (len < 0.001) { out.set(0, 0, 0); return 0; }
-  out.set(x / len, 0, z / len);
-  return 1;
+	const s = Math.sin(yaw), c = Math.cos(yaw), x = (b - f) * s + (r - l) * c, z = (b - f) * c - (r - l) * s, len = Math.hypot(x, z);
+	out.set(len ? x / len : 0, 0, len ? z / len : 0);
+	return len > 1e-3;
 }
