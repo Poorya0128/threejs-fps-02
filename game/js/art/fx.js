@@ -80,7 +80,8 @@ export function createFx(scene) {
 		update(state, vm, dt, chars, eye) {
 			while (state.fxHead !== state.fxTail) { event(state.fxEvents[state.fxHead], vm, chars, eye); state.fxHead = (state.fxHead + 1) % state.fxEvents.length; }
 			lightT = Math.max(0, lightT - dt); light.intensity = lightMax * lightT / lightDur;
-			for (const tr of tracers) if (tr.m.visible) { // a thin 1.8 m streak flying at 520 m/s from the muzzle to the hit point
+			for (const tr of tracers) if (tr.m.visible) { // a thin 1.8 m streak flying at 520 m/s; a paused frame never holds one
+				if (!dt) { tr.m.visible = false; continue; }
 				const d = (tr.t += dt) * 520;
 				if (d > tr.len + 1.2) tr.m.visible = false;
 				else { tr.m.position.lerpVectors(tr.a, tr.b, Math.min(1, d / tr.len)); tr.m.lookAt(tr.b); }

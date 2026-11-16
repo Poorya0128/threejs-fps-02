@@ -39,16 +39,19 @@ html,body{margin:0;height:100%;overflow:hidden;background:#000;color:var(--ink);
 #dCash.up,#dCash.dn{animation:cash 1.4s ease-out}
 #dCash.dn{color:var(--red)}
 @keyframes cash{0%{opacity:1;transform:translateY(4px)}70%{opacity:1}to{opacity:0;transform:translateY(-6px)}}
-#wpn{right:14px;bottom:14px;width:250px;padding:10px 14px;text-align:right}
-#ammo{font-size:38px;font-weight:700;line-height:1}
-#ammo small{font-size:18px;color:var(--mute);font-weight:500;margin-left:6px}
-#mags{display:flex;justify-content:flex-end;align-items:center;gap:3px;height:16px;margin-top:5px}
-#mags span{font-size:13px;font-weight:600;margin-right:5px}
-#mags i{width:7px;height:15px;background:var(--ink);opacity:.85;clip-path:polygon(0 0,100% 0,100% 100%,35% 100%,0 75%)}
+#wpn{right:14px;bottom:14px;padding:7px 14px 7px 18px;display:grid;grid-template-columns:auto auto;column-gap:10px;align-items:end}
+#ammo{font-size:46px;font-weight:700;line-height:.9;text-align:right}
+#ammo small{font-size:19px;color:var(--mute);font-weight:500;margin-left:5px}
 #ammo.low{color:var(--red)}
-#nades{display:flex;gap:8px;justify-content:flex-end;margin-top:6px;font-size:11px}
-#nades span{opacity:.25}
-#nades span.on{opacity:1}
+#mags{display:flex;flex-direction:column;gap:3px;padding-bottom:3px}
+#mags span{font-size:12px;font-weight:600;line-height:1}
+#mags b{display:flex;gap:3px}
+#mags i{width:7px;height:15px;background:var(--ink);opacity:.85;clip-path:polygon(0 0,100% 0,100% 100%,35% 100%,0 75%)}
+#wf{grid-column:1/-1;display:flex;justify-content:space-between;align-items:baseline;gap:12px;border-top:1px solid var(--line);margin-top:6px;padding-top:4px}
+#wname{color:var(--ink);font-weight:600}
+#nades{display:flex;gap:7px;justify-content:flex-end;font-size:10px;letter-spacing:.12em}
+#nades span{display:none}
+#nades span.on,#nades #kit{display:inline}
 #nades span.sel{color:var(--amber)}
 #cross{position:absolute;left:50%;top:50%;--g:6px}
 #cross i{position:absolute;background:#f4f0e6;box-shadow:0 0 0 1px rgba(0,0,0,.45)}

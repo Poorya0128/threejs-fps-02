@@ -31,7 +31,7 @@ const hgArc = (z, [cy, rx, ry], deg) => deg.map((d) => P((rx + .009) * Math.cos(
 // Left hand: palm under the handguard, four fingers up its right side, thumb along the left (long guns), or cupping
 // the right hand (pistols). Gloves are light coyote against the dark gun; sleeves are muted team cloth.
 function buildArms(team, w, knife) {
-	const R = new Bld(), L = new Bld(), glove = lin(0xa48a62), tip = lin(0x7c6646), sleeve = lin(new Color(TEAM_LOOK[team].cloth).lerp(new Color(0x3c3d3e), .5).getHex()), strap = lin(0x2c2b27);
+	const R = new Bld(), L = new Bld(), glove = lin(0xa48a62), tip = lin(0x7c6646), sleeve = lin(new Color(TEAM_LOOK[team].cloth).lerp(new Color(0x3c3d3e), .5).getHex());
 	seg(R, P(.006,-.04,.05), P(.008,-.094,.064), .017, glove);
 	pad(R, .02,-.064,.036,.013,.036,.03,-.23, glove);
 	for (const y of [-.052,-.072,-.092]) finger(R, gripArc(y, [25,-40,-105,-165]), .0092, glove, tip);
@@ -47,7 +47,6 @@ function buildArms(team, w, knife) {
 		const wx = -rx - .012, wy = cy - ry - .004, wz = z + .055;
 		seg(L, P(wx + .004, wy + .004, wz - .01), P(wx - .018, wy - .026, wz + .03), .026, glove);
 		limb(L, _a.set(wx - .012, wy - .018, wz + .02), _b.set(wx - .17, wy - .22, wz + .18), .034,.046, sleeve, 0);
-		seg(L, P(-.026, cy - .01, z + .09), P(-.05,-.06, z + .26), .005, strap); seg(L, P(-.05,-.06, z + .26), P(-.13,-.2, z + .5), .005, strap);
 	} else if (!knife) {
 		const [x, y, z] = [-.03,-.075,.015];
 		seg(L, P(x - .03, y - .02, z + .01), P(x - .026, y - .06, z + .02), .02, glove);

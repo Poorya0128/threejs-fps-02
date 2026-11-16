@@ -102,7 +102,7 @@ export function createHud(map) {
 			if (v.grenadeMode) html('ammo', `${v.nades[v.nadeSel]} <small>LMB THROW · RMB LOB</small>`);
 			else html('ammo', w.cls === 'knife' ? '—' : `${am.mag}<small>/ ${w.mag}</small>`);
 			const mags = w.cls === 'knife' || v.grenadeMode ? -1 : Math.ceil(am.reserve / w.mag); // spare magazines, one icon each
-			if (last.mags !== mags) { last.mags = mags; html('mags', mags < 0 ? '' : `<span>×${mags}</span>${'<i></i>'.repeat(Math.min(mags, 8))}`); }
+			if (last.mags !== mags) { last.mags = mags; html('mags', mags < 0 ? '' : `<span>×${mags}</span><b>${'<i></i>'.repeat(Math.min(mags, 8))}</b>`); }
 			cls('ammo', 'low', !v.grenadeMode && w.mag > 0 && am.mag <= Math.ceil(w.mag / 5));
 			text('wname', v.grenadeMode ? GRENADES[v.nadeSel].name : `${w.name}${v.reloadT > 0 || v.reloadShell > 0 ? ' · RELOADING' : ''}`);
 			for (const [k, id] of [['nS', 'shard'], ['nV', 'veil'], ['nG', 'glare']]) { text(k, `${GRENADES[id].name}${v.nades[id] > 1 ? ' ×' + v.nades[id] : ''}`); cls(k, 'on', v.nades[id] > 0); cls(k, 'sel', v.grenadeMode && v.nadeSel === id); }
