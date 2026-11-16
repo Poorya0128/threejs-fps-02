@@ -37,7 +37,7 @@ CRATE(-36.2, 6.5, 2); CRATE(-37.4, 6.5);
 BLD(-50, -38, -6, -28, 8.5, 8);
 BLD(-34, -20, -6, -12, 6.5, 8);
 wall(0, -12, -7, -35, -34, 4, 11);
-CONT(-48.3, -21, true, 3); CONT(-48.3, -14.6, true, 4); CRATE(-38, -17, 2); CRATE(-36.8, -17); CRATE(-46, -10.5);
+CONT(-48.3, -21, true, 3); CONT(-48.3, -14.6, true, 4); CRATE(-38, -17, 2); CRATE(-36.8, -17); CRATE(-16, -20.65); CRATE(-14.8, -20.65, 2); CRATE(-46, -10.5);
 R(-32, -27.2, -10, -25.6, 1.4, 13);
 CRATE(-24, -21.4, 2); R(-17, -21.2, -14, -20.6, 0.85, 5); CRATE(-31, -21.2);
 // Pans (site A): evaporation basins, pump tower, salt piles.
@@ -107,13 +107,17 @@ props.push(
   ['sign', 'PANS', -8, 3.6, -20.05, 0, 3], ['sign', 'BOILER', 10, 4.6, 16, 0, 3.6], ['sign', 'CONVEYOR', -34.05, 3.4, -14, 1, 3.4],
   ['sign', 'CULVERT', -34.05, 3.4, 22, 1, 3], ['sign', 'PUMPHOUSE', -17.95, 3.9, 1.5, 1, 3.4], ['sign', 'BRINEHOLD SALTWORKS', -20, 6, -12, 2, 9],
   ['sign', 'BASTION', 30, 4.4, -26, 2, 3.4],
-  ['bags', 8, -19.6, 12, -18.9, 1.1], ['bags', 10, 7, 13.6, 7.7, 1.1], ['shaft', 2.4, 4, 6, 18.5, 21.5], ['shaft', 2.4, 4, 6, 30.5, 33.5], ['zone', 8, -26, 'A'], ['zone', 13, 22, 'B'],
+  ['bags', 8, -19.6, 12, -18.9, 1.1], ['bags', 10, 7, 13.6, 7.7, 1.1], ['shaft', 2.4, 4, 6, 18.5, 21.5], ['tape', 10, 15.6, 4, 0], ['tape', 1.6, 26, 4, Math.PI / 2], ['tape', 26.4, 20.75, 3.5, Math.PI / 2],
+  ['tape', -5.6, -24.5, 6, Math.PI / 2], ['tape', 4, -15.6, 5, 0], ['tape', 24.4, -23, 5, Math.PI / 2], ['shaft', 2.4, 4, 6, 30.5, 33.5], ['zone', 8, -26, 'A'], ['zone', 13, 22, 'B'],
 );
 
 
 const MAP = {
   bounds: { x0: -50, x1: 50, z0: -38, z1: 38 },
   boxes, buildings, props, floors,
+  // Radar lane names [text, x, z].
+  callouts: [['PANS', 4, -34], ['BOILER', 18, 32], ['CONVEYOR', -22, -21], ['CULVERT', -22, 24], ['PUMPHOUSE', -11, 3], ['COURTYARD', 12, -4],
+    ['YARD', -42, 8], ['COURT', 40, 5], ['NORTH YARD', -42, -18], ['BRINE', 30, -18]],
   spawns: { strand: [-42, 3], bastion: [40, 0] },
   zones: {
     buyStrand: { x0: -50, z0: -6, x1: -34, z1: 12 },

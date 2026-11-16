@@ -42,7 +42,7 @@ export function createInput(canvas, input) {
 
 // Mouse look, applied every rendered frame for responsiveness (the simulation reads yaw/pitch each tick).
 export function applyLook(input, a) {
-	const k = INPUT.mouseSens * (a.scopeLevel === 2 ? 0.2 : a.scopeLevel === 1 ? 0.45 : 1);
+	const k = INPUT.mouseSens * (a.scopeLevel === 2 ? .2 : a.scopeLevel === 1 ? .45 : 1);
 	a.yaw -= input.lookDX * k;
 	a.pitch = Math.max(-INPUT.pitchMax, Math.min(INPUT.pitchMax, a.pitch - input.lookDY * k));
 	input.lookDX = input.lookDY = 0;

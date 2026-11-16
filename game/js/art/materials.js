@@ -66,8 +66,8 @@ export function procMaterial(o) {
 		envMapIntensity: o.env ?? 1, emissive: o.emissive ?? 0, emissiveIntensity: o.ei ?? 1 });
 	const u = {
 		uPat: { value: o.pat ?? 9 }, uC2: { value: new Color(o.c2 ?? 0x000000) },
-		uK: { value: new Vector4(o.scale ?? 1, o.cvar ?? 0.08, o.r0 ?? 0.6, o.r1 ?? 0.9) },
-		uL: { value: new Vector4(o.bump ?? 0.02, o.dirt ?? 0, o.rime ?? 0, o.wear ?? 0) },
+		uK: { value: new Vector4(o.scale ?? 1, o.cvar ?? .08, o.r0 ?? .6, o.r1 ?? .9) },
+		uL: { value: new Vector4(o.bump ?? .02, o.dirt ?? 0, o.rime ?? 0, o.wear ?? 0) },
 	};
 	m.onBeforeCompile = (sh) => {
 		Object.assign(sh.uniforms, u);
@@ -89,8 +89,8 @@ export function procMaterial(o) {
 			// Characters (pattern 12, uL = bump, rim, accent glow, hit flash): fresnel rim + emissive team accents so
 			// soldiers never fall to a black silhouette in shade, and a short red-white flash when hit.
 			.replace('#include <emissivemap_fragment>', `#include <emissivemap_fragment>
-				if (int(uPat + .5) == 12) totalEmissiveRadiance += pc * step(2.5, vE) * uL.z + vec3(1., .4, .3) * uL.w
-					+ vec3(1., .92, .82) * pow(1. - abs(dot(normal, normalize(vViewPosition))), 3.) * uL.y * (.35 + .65 * pc);`);
+				if (int(uPat + .5) == 12) totalEmissiveRadiance += diffuseColor.rgb * step(2.5, vE) * uL.z + vec3(1.,.4,.3) * uL.w
+					+ vec3(1.,.92,.82) * pow(1. - abs(dot(normal, normalize(vViewPosition))), 3.) * uL.y * (.35 + .65 * diffuseColor.rgb);`);
 	};
 	m.customProgramCacheKey = () => 'saltline-proc';
 	m.userData.u = u;
@@ -100,26 +100,26 @@ export function procMaterial(o) {
 // World material presets by map material id (map.js). pat: 0 formwork concrete, 1 plaster over brick, 2 metal,
 // 3 corrugated, 4 planks, 5 hazard, 6 asphalt, 7 salt crust, 8 cloth, 9 polymer, 10 block masonry, 11 brine, 12 character.
 export const WORLD = [
-	{ c: 0xb9b2a4, pat: 0, scale: 0.6, cvar: 0.1, r0: 0.75, r1: 0.95, bump: 0.025, dirt: 1, rime: 1, wear: 0.6 },
-	{ c: 0xd8d2c4, pat: 10, scale: 0.8, r0: 0.8, r1: 0.95, bump: 0.02, dirt: 0.7, rime: 1, wear: 0.5 },
-	{ c: 0x62676d, c2: 0x7a4a2c, pat: 2, scale: 0.9, r0: 0.45, r1: 0.7, metal: 0.35, bump: 0.01, dirt: 0.4, wear: 1 },
-	{ c: 0x9a4430, c2: 0x5a2c1a, pat: 3, scale: 0.7, r0: 0.5, r1: 0.75, metal: 0.15, bump: 0.04, dirt: 0.6, rime: 0.5, wear: 1 },
-	{ c: 0x3b7f78, c2: 0x6b3a22, pat: 3, scale: 0.7, r0: 0.5, r1: 0.75, metal: 0.15, bump: 0.04, dirt: 0.6, rime: 0.5, wear: 1 },
-	{ c: 0xe39a2e, c2: 0x1c1c1e, pat: 5, scale: 1, r0: 0.5, r1: 0.7, bump: 0.02, dirt: 0.8, wear: 0.8 },
-	{ c: 0x9a7650, pat: 4, scale: 1.2, cvar: 0.12, r0: 0.7, r1: 0.9, bump: 0.03, dirt: 0.5, wear: 0.8 },
-	{ c: 0x4a4744, c2: 0x6b3a22, pat: 3, scale: 0.6, r0: 0.6, r1: 0.85, metal: 0.2, bump: 0.03 },
-	{ c: 0xcdbfa8, c2: 0x8a6250, pat: 1, scale: 0.5, cvar: 0.1, r0: 0.8, r1: 0.95, bump: 0.025, dirt: 1, rime: 0.8, wear: 0.5 },
-	{ c: 0xb4b8ba, c2: 0x7a4a2c, pat: 2, scale: 0.8, r0: 0.35, r1: 0.55, metal: 0.55, bump: 0.01, dirt: 0.5, rime: 0.4, wear: 1 },
-	{ c: 0x4a6278, c2: 0x5a2c1a, pat: 3, scale: 0.7, r0: 0.5, r1: 0.75, metal: 0.15, bump: 0.04, dirt: 0.6, rime: 0.5, wear: 1 },
-	{ c: 0xa3a6a6, c2: 0x7a4a2c, pat: 3, scale: 0.7, r0: 0.4, r1: 0.6, metal: 0.45, bump: 0.035, dirt: 0.7, rime: 0.6, wear: 1 },
+	{ c: 0xb9b2a4, pat: 0, scale: .6, cvar: .1, r0: .75, r1: .95, bump: .025, dirt: 1, rime: 1, wear: .6 },
+	{ c: 0xd8d2c4, pat: 10, scale: .8, r0: .8, r1: .95, bump: .02, dirt: .7, rime: 1, wear: .5 },
+	{ c: 0x62676d, c2: 0x7a4a2c, pat: 2, scale: .9, r0: .45, r1: .7, metal: .35, bump: .01, dirt: .4, wear: 1 },
+	{ c: 0x9a4430, c2: 0x5a2c1a, pat: 3, scale: .7, r0: .5, r1: .75, metal: .15, bump: .04, dirt: .6, rime: .5, wear: 1 },
+	{ c: 0x3b7f78, c2: 0x6b3a22, pat: 3, scale: .7, r0: .5, r1: .75, metal: .15, bump: .04, dirt: .6, rime: .5, wear: 1 },
+	{ c: 0xe39a2e, c2: 0x1c1c1e, pat: 5, scale: 1, r0: .5, r1: .7, bump: .02, dirt: .8, wear: .8 },
+	{ c: 0x9a7650, pat: 4, scale: 1.2, cvar: .12, r0: .7, r1: .9, bump: .03, dirt: .5, wear: .8 },
+	{ c: 0x4a4744, c2: 0x6b3a22, pat: 3, scale: .6, r0: .6, r1: .85, metal: .2, bump: .03 },
+	{ c: 0xcdbfa8, c2: 0x8a6250, pat: 1, scale: .5, cvar: .1, r0: .8, r1: .95, bump: .025, dirt: 1, rime: .8, wear: .5 },
+	{ c: 0xb4b8ba, c2: 0x7a4a2c, pat: 2, scale: .8, r0: .35, r1: .55, metal: .55, bump: .01, dirt: .5, rime: .4, wear: 1 },
+	{ c: 0x4a6278, c2: 0x5a2c1a, pat: 3, scale: .7, r0: .5, r1: .75, metal: .15, bump: .04, dirt: .6, rime: .5, wear: 1 },
+	{ c: 0xa3a6a6, c2: 0x7a4a2c, pat: 3, scale: .7, r0: .4, r1: .6, metal: .45, bump: .035, dirt: .7, rime: .6, wear: 1 },
 ];
 // Ground kinds used by map floors: asphalt, concrete slab, salt gravel, brine basin, wet culvert concrete.
 export const GROUND = [
-	{ c: 0x76716a, pat: 6, scale: 1.4, cvar: 0.1, r0: 0.75, r1: 0.95, bump: 0.03 },
-	{ c: 0x9d978c, pat: 0, scale: 0.6, cvar: 0.12, r0: 0.7, r1: 0.92, bump: 0.02 },
-	{ c: 0xd9d1c4, pat: 7, scale: 1.5, cvar: 0.06, r0: 0.75, r1: 0.95, bump: 0.04 },
-	{ c: 0x9c8682, c2: 0xece7de, pat: 11, scale: 1, cvar: 0.06, bump: 0.015 },
-	{ c: 0x6e6c66, pat: 6, scale: 1.2, cvar: 0.1, r0: 0.25, r1: 0.6, bump: 0.025 },
+	{ c: 0x76716a, pat: 6, scale: 1.4, cvar: .1, r0: .75, r1: .95, bump: .03 },
+	{ c: 0x9d978c, pat: 0, scale: .6, cvar: .12, r0: .7, r1: .92, bump: .02 },
+	{ c: 0xd9d1c4, pat: 7, scale: 1.5, cvar: .06, r0: .75, r1: .95, bump: .04 },
+	{ c: 0x9c8682, c2: 0xece7de, pat: 11, scale: 1, cvar: .06, bump: .015 },
+	{ c: 0x6e6c66, pat: 6, scale: 1.2, cvar: .1, r0: .25, r1: .6, bump: .025 },
 ];
 export const worldMaterials = () => WORLD.map(procMaterial);
 export const groundMaterials = () => GROUND.map((o) => procMaterial({ ...o, vc: true }));

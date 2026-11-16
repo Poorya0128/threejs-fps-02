@@ -5,17 +5,17 @@ const MAX_LINK_DIST = 20;
 function sweepClear(boxes, x0, z0, x1, z1, y) {
 	const dx = x1 - x0, dz = z1 - z0;
 	const len = Math.hypot(dx, dz);
-	if (len < 0.01) return true;
-	const steps = Math.max(2, Math.ceil(len / 0.8));
+	if (len < .01) return true;
+	const steps = Math.max(2, Math.ceil(len / .8));
 	for (let s = 0; s <= steps; s++) {
 		const t = s / steps;
 		const x = x0 + dx * t, z = z0 + dz * t;
 		for (let i = 0; i < boxes.length; i++) {
 			const b = boxes[i];
 			if (y + 1.7 <= b.min.y || y >= b.max.y) continue;
-			if (x + 0.4 < b.min.x || x - 0.4 > b.max.x) continue;
-			if (z + 0.4 < b.min.z || z - 0.4 > b.max.z) continue;
-			if (b.max.y - y <= 0.45) continue;
+			if (x + .4 < b.min.x || x - .4 > b.max.x) continue;
+			if (z + .4 < b.min.z || z - .4 > b.max.z) continue;
+			if (b.max.y - y <= .45) continue;
 			return false;
 		}
 	}
@@ -33,10 +33,10 @@ export function buildNav(map, boxes) {
 			const dx = b[1] - a[1], dz = b[2] - a[2];
 			const dist = Math.hypot(dx, dz);
 			if (dist > MAX_LINK_DIST) continue;
-			if (Math.abs(a[3] - b[3]) > 0.5) continue;
+			if (Math.abs(a[3] - b[3]) > .5) continue;
 			const y = Math.min(a[3], b[3]);
 			if (!sweepClear(boxes, a[1], a[2], b[1], b[2], y)) continue;
-			if (!sweepClear(boxes, a[1], a[2], b[1], b[2], y + 0.9)) continue;
+			if (!sweepClear(boxes, a[1], a[2], b[1], b[2], y + .9)) continue;
 			links[i].push(j); links[j].push(i);
 		}
 	}

@@ -64,11 +64,11 @@ export function rayCapsule(ox, oy, oz, dx, dy, dz, ax, ay, az, bx, by, bz, r, ma
 export function losBlocked(boxes, x0, y0, z0, x1, y1, z1) {
 	const dx = x1 - x0, dy = y1 - y0, dz = z1 - z0;
 	const len = Math.hypot(dx, dy, dz);
-	if (len < 0.01) return false;
+	if (len < .01) return false;
 	for (let i = 0; i < boxes.length; i++) {
 		const b = boxes[i];
 		const t = rayAABB(x0, y0, z0, dx / len, dy / len, dz / len, b.min, b.max, len);
-		if (t >= 0 && t < len - 0.05) return true;
+		if (t >= 0 && t < len - .05) return true;
 	}
 	return false;
 }
@@ -79,7 +79,7 @@ export function smokeBlocks(smokes, time, x0, y0, z0, x1, y1, z1) {
 		if (!s.active || time > s.t + s.dur) continue;
 		const dx = x1 - x0, dy = y1 - y0, dz = z1 - z0;
 		const len = Math.hypot(dx, dy, dz);
-		if (len < 0.01) continue;
+		if (len < .01) continue;
 		if (raySphere(x0, y0, z0, dx / len, dy / len, dz / len, s.x, s.y, s.z, s.r, len) >= 0) return true;
 	}
 	return false;

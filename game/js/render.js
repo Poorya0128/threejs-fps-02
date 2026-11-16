@@ -13,7 +13,7 @@ export function createRenderer(holder) {
 	renderer.info.autoReset = false;
 	holder.appendChild(renderer.domElement);
 	const scene = new Scene(), vmScene = new Scene();
-	const camera = new PerspectiveCamera(80, innerWidth / innerHeight, 0.05, 900), vmCamera = new PerspectiveCamera(54, innerWidth / innerHeight, 0.01, 5);
+	const camera = new PerspectiveCamera(80, innerWidth / innerHeight, .05,900), vmCamera = new PerspectiveCamera(54, innerWidth / innerHeight, .01,5);
 	camera.rotation.order = 'YXZ';
 	const post = createPost(renderer);
 	addEventListener('resize', () => {
@@ -26,14 +26,14 @@ export function createRenderer(holder) {
 		// Eye position interpolated between the last two ticks; the camera shows half of the recoil (view punch).
 		placeCamera(a, alpha, fov) {
 			camera.position.lerpVectors(a.prevPos, a.pos, alpha).y += a.eyeHeight;
-			camera.rotation.set(a.pitch + a.recoil.pitch * 0.5, a.yaw + a.recoil.yaw * 0.5, 0);
+			camera.rotation.set(a.pitch + a.recoil.pitch * .5, a.yaw + a.recoil.yaw * .5,0);
 			const w = WEAPONS[a.weapons[a.active]];
 			setFov(a.scoped && w && w.zoomFov ? w.zoomFov[a.scopeLevel - 1] : fov);
 		},
 		orbit(t) {
-			const r = 34, ang = t * 0.04 + 2.2;
-			camera.position.set(Math.cos(ang) * r, 15, -12 + Math.sin(ang) * r * 0.7);
-			camera.lookAt(0, 1, -10); setFov(62);
+			const r = 34, ang = t * .04 + 2.2;
+			camera.position.set(Math.cos(ang) * r, 15,-12 + Math.sin(ang) * r * .7);
+			camera.lookAt(0,1,-10); setFov(62);
 		},
 		renderFrame(time) {
 			renderer.info.reset();

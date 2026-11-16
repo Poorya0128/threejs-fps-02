@@ -59,13 +59,13 @@ function setRoute(state, bot, names) {
 export function onRoundStart(state) {
 	teamBuy(state, 'strand'); teamBuy(state, 'bastion');
 	const plan = ['rushPans', 'rushBoiler', 'split', 'spread'][Math.floor(state.rng() * 4)], routes = state.map.plans.strand[plan], h = state.map.plans.bastion;
-	state.attackSite = plan === 'rushPans' ? 'pans' : plan === 'rushBoiler' ? 'boiler' : state.rng() < 0.5 ? 'pans' : 'boiler';
+	state.attackSite = plan === 'rushPans' ? 'pans' : plan === 'rushBoiler' ? 'boiler' : state.rng() < .5 ? 'pans' : 'boiler';
 	const anchors = [...h.pans, ...h.boiler, h.rotator];
 	let si = 0, bi = 0;
 	for (const a of state.agents) {
 		const br = a.brain;
 		if (!br || !driven(state, a)) continue;
-		Object.assign(br, { target: null, usedUtil: false, burst: 0, crouch: state.rng() < 0.35, hold: -1, state: 'followRoute' });
+		Object.assign(br, { target: null, usedUtil: false, burst: 0, crouch: state.rng() < .35, hold: -1, state: 'followRoute' });
 		br.known.t = -99;
 		if (a.team === 'strand') setRoute(state, a, a.hasFuse ? routes[0] : routes[si++ % routes.length]);
 		else { br.hold = state.nav.byName(anchors[bi++ % anchors.length]); setRoute(state, a, [br.hold]); }
@@ -75,14 +75,14 @@ export function onRoundStart(state) {
 
 function blocked(state, ox, oy, oz, tx, ty, tz) {
 	const dx = tx - ox, dy = ty - oy, dz = tz - oz, len = Math.hypot(dx, dy, dz);
-	for (const b of state.boxes) { const t = rayAABB(ox, oy, oz, dx / len, dy / len, dz / len, b.min, b.max, len); if (t >= 0 && t < len - 0.3) return true; }
+	for (const b of state.boxes) { const t = rayAABB(ox, oy, oz, dx / len, dy / len, dz / len, b.min, b.max, len); if (t >= 0 && t < len - .3) return true; }
 	return smokeBlocks(state.smokes, state.time, ox, oy, oz, tx, ty, tz);
 }
 // Sight: 110° field of view, 70 m, line of sight to head or chest through map boxes and Veil smoke, not while blind.
 export function canSee(state, bot, t) {
 	const dx = t.pos.x - bot.pos.x, dz = t.pos.z - bot.pos.z, d = Math.hypot(dx, dz), ey = bot.pos.y + bot.eyeHeight, ty = t.pos.y + t.eyeHeight;
-	if (bot.flashT > 0.4 || d > 70 || d < 0.05 || (-Math.sin(bot.yaw) * dx - Math.cos(bot.yaw) * dz) / d < 0.57) return false;
-	return !blocked(state, bot.pos.x, ey, bot.pos.z, t.pos.x, ty, t.pos.z) || !blocked(state, bot.pos.x, ey, bot.pos.z, t.pos.x, ty - 0.45, t.pos.z);
+	if (bot.flashT > .4 || d > 70 || d < .05 || (-Math.sin(bot.yaw) * dx - Math.cos(bot.yaw) * dz) / d < .57) return false;
+	return !blocked(state, bot.pos.x, ey, bot.pos.z, t.pos.x, ty, t.pos.z) || !blocked(state, bot.pos.x, ey, bot.pos.z, t.pos.x, ty - .45, t.pos.z);
 }
 
 // Hearing: enemy shots, running steps, plants/defuses and grenades inside their radius update the last known position;
@@ -124,16 +124,16 @@ function aimAt(bot, tx, ty, tz, dt, rate) {
 // Steering with stuck detection: after 1.2 s without progress the bot sidesteps for 0.9 s.
 function steer(state, bot, tx, tz, dt) {
 	const br = bot.brain, dx = tx - bot.pos.x, dz = tz - bot.pos.z, d = Math.hypot(dx, dz) || 1e-3;
-	if (d < br.lastD - 0.05) { br.lastD = d; br.stuckT = 0; } else if ((br.stuckT += dt) > 1.2 && br.detourT <= 0) { br.detourT = 0.9; br.detour = -br.detour; br.lastD = 1e9; br.stuckT = 0; }
+	if (d < br.lastD - .05) { br.lastD = d; br.stuckT = 0; } else if ((br.stuckT += dt) > 1.2 && br.detourT <= 0) { br.detourT = .9; br.detour = -br.detour; br.lastD = 1e9; br.stuckT = 0; }
 	let side = 0;
 	if (br.detourT > 0) { br.detourT -= dt; side = br.detour; }
-	MOVE.x = (dx * (side ? 0.4 : 1) - dz * side) / d; MOVE.z = (dz * (side ? 0.4 : 1) + dx * side) / d;
+	MOVE.x = (dx * (side ? .4 : 1) - dz * side) / d; MOVE.z = (dz * (side ? .4 : 1) + dx * side) / d;
 	bot.yaw += Math.max(-7 * dt, Math.min(7 * dt, wrap(Math.atan2(-MOVE.x, -MOVE.z) - bot.yaw)));
 	return d;
 }
 function walkClear(state, x0, z0, x1, z1) {
 	const dx = x1 - x0, dz = z1 - z0, len = Math.hypot(dx, dz);
-	for (const b of state.boxes) if (b.max.y > 0.45 && b.min.y < 1.4) for (const y of [0.5, 1.3]) if (y > b.min.y && y < b.max.y && rayAABB(x0, y, z0, dx / len, 0, dz / len, b.min, b.max, len) >= 0) return false;
+	for (const b of state.boxes) if (b.max.y > .45 && b.min.y < 1.4) for (const y of [.5,1.3]) if (y > b.min.y && y < b.max.y && rayAABB(x0, y, z0, dx / len, 0, dz / len, b.min, b.max, len) >= 0) return false;
 	return true;
 }
 // Route following: skips ahead to the farthest visible waypoint and slows down at corners flagged for holding.
@@ -141,11 +141,11 @@ function followRoute(state, bot, dt) {
 	const br = bot.brain;
 	if (br.ri >= br.route.length) return false;
 	if ((br.smoothT -= dt) <= 0) {
-		br.smoothT = 0.4;
-		for (let j = Math.min(br.route.length - 1, br.ri + 4); j > br.ri; j--) { const n = state.nodes[br.route[j]]; if (Math.abs(n[3] - bot.pos.y) < 0.4 && walkClear(state, bot.pos.x, bot.pos.z, n[1], n[2])) { br.ri = j; break; } }
+		br.smoothT = .4;
+		for (let j = Math.min(br.route.length - 1, br.ri + 4); j > br.ri; j--) { const n = state.nodes[br.route[j]]; if (Math.abs(n[3] - bot.pos.y) < .4 && walkClear(state, bot.pos.x, bot.pos.z, n[1], n[2])) { br.ri = j; break; } }
 	}
 	const n = state.nodes[br.route[br.ri]];
-	if (steer(state, bot, n[1], n[2], dt) < 0.7) { if (n[4] & 1) br.pieT = 0.8; br.ri++; br.lastD = 1e9; }
+	if (steer(state, bot, n[1], n[2], dt) < .7) { if (n[4] & 1) br.pieT = .8; br.ri++; br.lastD = 1e9; }
 	return true;
 }
 
@@ -161,13 +161,13 @@ function think(state, bot, dt) {
 		if (best) {
 			if (br.target !== best) {
 				const sk = br.skill, dist = Math.sqrt(bd);
-				br.reactT = (sk.react[0] + state.rng() * (sk.react[1] - sk.react[0])) * (best.crouch > 0.5 ? 1.25 : 1) * (1 + dist / 80);
+				br.reactT = (sk.react[0] + state.rng() * (sk.react[1] - sk.react[0])) * (best.crouch > .5 ? 1.25 : 1) * (1 + dist / 80);
 				br.err = sk.aimErr * (1.5 + dist / 25); br.ex = state.rng() * 6.28; br.target = best; callout(state, bot, best);
 			}
 			Object.assign(br.known, { x: best.pos.x, z: best.pos.z, t: state.time }); br.lostT = 0; br.state = 'engage';
-		} else if (br.state === 'engage' && (br.lostT += 2 / 64) > 0.7) { br.target = null; br.state = 'investigate'; }
+		} else if (br.state === 'engage' && (br.lostT += 2 / 64) > .7) { br.target = null; br.state = 'investigate'; }
 	}
-	if (br.state === 'engage' || bot.flashT > 0.4) return;
+	if (br.state === 'engage' || bot.flashT > .4) return;
 	const goSite = (name) => { setRoute(state, bot, [name]); br.state = 'followRoute'; };
 	if (state.phase === 'planted') {
 		if (bot.team === 'bastion') {
@@ -192,7 +192,7 @@ function think(state, bot, dt) {
 function utility(state, bot, dt) {
 	const br = bot.brain, k = br.known;
 	if ((br.utilT -= dt) > 0) return;
-	br.utilT = 0.5;
+	br.utilT = .5;
 	if (!br.usedUtil && bot.team === 'strand' && br.state === 'followRoute') for (const [node, kind, tx, tz] of LINEUPS) {
 		const n = state.nodes[state.nav.byName(node)];
 		if (bot.nades[kind] > 0 && D2(bot, n[1], n[2]) < 36) { bot.nadeSel = kind; if (throwGrenade(state, bot, false, tx, 1.2, tz)) { br.usedUtil = true; feed(state, `${bot.name}: Veil out`); return; } }
@@ -209,38 +209,38 @@ function utility(state, bot, dt) {
 export function driveAgent(state, bot, dt) {
 	const br = bot.brain;
 	if (!bot.alive) return;
-	if (state.phase !== 'live' && state.phase !== 'planted') { setCrouch(state, bot, false, dt); stepAgent(state, bot, 0, 0, 0, false, dt); return; }
+	if (state.phase !== 'live' && state.phase !== 'planted') { setCrouch(state, bot, false, dt); stepAgent(state, bot, 0,0,0, false, dt); return; }
 	think(state, bot, dt); utility(state, bot, dt);
 	const w = activeWeapon(bot), run = maxSpeed(bot), f = state.fuse;
 	let mx = 0, mz = 0, speed = 0, crouch = false, fire = false;
 	const go = (k) => { mx = MOVE.x; mz = MOVE.z; speed = run * k; };
-	if (bot.flashT > 0.4) { mx = bot.pos.x - br.known.x; mz = bot.pos.z - br.known.z; speed = run * 0.6; bot.yaw += Math.sin(state.time * 3 + bot.id) * dt; }
+	if (bot.flashT > .4) { mx = bot.pos.x - br.known.x; mz = bot.pos.z - br.known.z; speed = run * .6; bot.yaw += Math.sin(state.time * 3 + bot.id) * dt; }
 	else if (br.state === 'engage' && br.target && br.target.alive) {
 		const t = br.target, dist = Math.sqrt(D2(bot, t.pos.x, t.pos.z)), sk = br.skill;
 		br.err *= Math.exp(-1.4 * dt);
-		const off = br.err * dist, miss = aimAt(bot, t.pos.x + Math.cos(br.ex) * off, t.pos.y + t.eyeHeight - (br.headAim ? 0 : 0.38) + Math.sin(br.ex) * off * 0.6, t.pos.z + Math.sin(br.ex) * off, dt, 10);
+		const off = br.err * dist, miss = aimAt(bot, t.pos.x + Math.cos(br.ex) * off, t.pos.y + t.eyeHeight - (br.headAim ? 0 : .38) + Math.sin(br.ex) * off * .6, t.pos.z + Math.sin(br.ex) * off, dt, 10);
 		const close = dist < 11 && (w.cls === 'smg' || w.cls === 'shotgun' || w.cls === 'knife');
 		if (w.cls === 'knife') { mx = t.pos.x - bot.pos.x; mz = t.pos.z - bot.pos.z; speed = run; }
-		else if (close) { if ((br.strafeT -= dt) <= 0) { br.strafeT = 0.35 + state.rng() * 0.5; br.strafe = -br.strafe; } mx = Math.cos(bot.yaw) * br.strafe; mz = -Math.sin(bot.yaw) * br.strafe; speed = run * 0.8; }
+		else if (close) { if ((br.strafeT -= dt) <= 0) { br.strafeT = .35 + state.rng() * .5; br.strafe = -br.strafe; } mx = Math.cos(bot.yaw) * br.strafe; mz = -Math.sin(bot.yaw) * br.strafe; speed = run * .8; }
 		crouch = br.crouch && dist > 12 && w.cls !== 'marksman';
-		if ((br.reactT -= dt) <= 0 && miss < 0.06 + computeSpread(bot) * 2) {
+		if ((br.reactT -= dt) <= 0 && miss < .06 + computeSpread(bot) * 2) {
 			if (br.burst <= 0 && (br.pause -= dt) <= 0) { br.burst = dist < 9 ? 10 : sk.burst[0] + Math.floor(state.rng() * (sk.burst[1] - sk.burst[0] + 1)); br.headAim = state.rng() < sk.head; }
-			if (br.burst > 0 && (close || Math.hypot(bot.vel.x, bot.vel.z) < run * 0.3)) { fire = true; if (state.time >= bot.nextFireT && --br.burst === 0) br.pause = 0.25 + state.rng() * 0.3; }
+			if (br.burst > 0 && (close || Math.hypot(bot.vel.x, bot.vel.z) < run * .3)) { fire = true; if (state.time >= bot.nextFireT && --br.burst === 0) br.pause = .25 + state.rng() * .3; }
 		}
 	} else if (br.state === 'investigate') {
 		const k = br.known, back = br.hold >= 0 ? 'holdAngle' : 'followRoute';
 		if (state.time - k.t > 7 || steer(state, bot, k.x, k.z, dt) <= 2.5) br.state = back;
-		else { go(0.52); aimAt(bot, k.x, bot.pos.y + 1.5, k.z, dt, 3); }
+		else { go(.52); aimAt(bot, k.x, bot.pos.y + 1.5, k.z, dt, 3); }
 	} else if (br.state === 'plant') {
 		if (!siteAt(state, bot.pos.x, bot.pos.z)) br.state = 'followRoute';
 		else { plantCharge(state, bot, dt); crouch = bot.plantT > 0; }
 	} else if (br.state === 'defuse' && f.planted) {
 		if (D2(bot, f.x, f.z) > 1.2) { if (!followRoute(state, bot, dt)) steer(state, bot, f.x, f.z, dt); go(1); }
 		else { defuseCharge(state, bot, dt); crouch = true; }
-	} else if (followRoute(state, bot, dt)) { go(br.pieT > 0 ? 0.5 : 1); br.pieT -= dt; }
+	} else if (followRoute(state, bot, dt)) { go(br.pieT > 0 ? .5 : 1); br.pieT -= dt; }
 	else if (br.state === 'fetch') { steer(state, bot, f.x, f.z, dt); go(1); if (!f.dropped) br.state = 'followRoute'; }
 	else if (br.hold >= 0) {
-		const n = state.nodes[br.hold], yaw = (n[5] ?? 0) * Math.PI / 180 + Math.sin(state.time * 0.5 + bot.id) * 0.5;
+		const n = state.nodes[br.hold], yaw = (n[5] ?? 0) * Math.PI / 180 + Math.sin(state.time * .5 + bot.id) * .5;
 		br.state = 'holdAngle'; crouch = br.crouch;
 		aimAt(bot, bot.pos.x - Math.sin(yaw), bot.pos.y + bot.eyeHeight, bot.pos.z - Math.cos(yaw), dt, 3);
 	} else if (bot.team === 'strand') { const h = holds(state, state.attackSite === 'pans' ? 2 : 4); br.hold = h[bot.id % h.length]; setRoute(state, bot, [br.hold]); }
@@ -249,7 +249,7 @@ export function driveAgent(state, bot, dt) {
 	stepAgent(state, bot, mx / len, mz / len, speed, false, dt);
 	for (const o of state.agents) {
 		const dx = bot.pos.x - o.pos.x, dz = bot.pos.z - o.pos.z, d2 = dx * dx + dz * dz;
-		if (o !== bot && o.alive && d2 < 0.5 && d2 > 1e-6) { const k = 2.5 * dt / Math.sqrt(d2); bot.pos.x += dx * k; bot.pos.z += dz * k; }
+		if (o !== bot && o.alive && d2 < .5 && d2 > 1e-6) { const k = 2.5 * dt / Math.sqrt(d2); bot.pos.x += dx * k; bot.pos.z += dz * k; }
 	}
 	const am = bot.ammo[activeId(bot)];
 	if (am && am.mag === 0 && am.reserve === 0) switchWeapon(bot, bot.weapons[1] ? 1 : 2);

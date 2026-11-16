@@ -37,17 +37,17 @@ export function computeSpread(a) {
 	if (w.cls === 'knife') return 0;
 	const s = w.spread;
 	let base = a.scoped && w.scopedSpread ? w.scopedSpread : s[0];
-	if (a.crouch > 0.5) base *= s[1];
-	const move = 0.035 * s[2] * clamp(Math.hypot(a.vel.x, a.vel.z) / maxSpeed(a) - 0.1, 0, 1);
+	if (a.crouch > .5) base *= s[1];
+	const move = .035 * s[2] * clamp(Math.hypot(a.vel.x, a.vel.z) / maxSpeed(a) - .1,0,1);
 	return base + move + (a.onGround ? 0 : s[3]) + a.spreadBloom;
 }
 
 // Spray pattern: kick = [vertical, climb per shot, horizontal sway, shots until the climb levels off].
 // The same shot index always kicks the same way (learnable), with ±12 % jitter.
 export function applyRecoil(state, a, w) {
-	const k = w.kick, i = a.shotsFired, j = 1 + (state.rng() - 0.5) * 0.24;
-	a.recoil.pitch += k[0] * (1 + k[1] * Math.min(i, k[3])) * (i < k[3] ? 1 : 0.35) * j;
-	a.recoil.yaw += k[2] * Math.sin(i * 0.55 + 0.8) * Math.min(1, i / 4) * j;
+	const k = w.kick, i = a.shotsFired, j = 1 + (state.rng() - .5) * .24;
+	a.recoil.pitch += k[0] * (1 + k[1] * Math.min(i, k[3])) * (i < k[3] ? 1 : .35) * j;
+	a.recoil.yaw += k[2] * Math.sin(i * .55 + .8) * Math.min(1, i / 4) * j;
 	a.spreadBloom += w.spread[4];
 	a.shotsFired++; a.lastShotT = state.time;
 }
@@ -56,13 +56,13 @@ function traceAgent(ox, oy, oz, dx, dy, dz, t, maxDist, out) {
 	const ey = t.pos.y + t.eyeHeight, fx = -Math.sin(t.yaw), fz = -Math.cos(t.yaw), rx = -fz, rz = fx, X = t.pos.x, Z = t.pos.z;
 	let best = -1;
 	const test = (tt, g) => { if (tt >= 0 && (best < 0 || tt < best)) { best = tt; out.group = g; } };
-	test(raySphere(ox, oy, oz, dx, dy, dz, X + fx * 0.02, ey + 0.04, Z + fz * 0.02, 0.13, maxDist), 'head');
-	test(rayCapsule(ox, oy, oz, dx, dy, dz, X, ey - 0.16, Z, X, ey - 0.48, Z, 0.21, maxDist), 'chest');
-	test(rayCapsule(ox, oy, oz, dx, dy, dz, X, ey - 0.5, Z, X, ey - 0.78, Z, 0.18, maxDist), 'stomach');
+	test(raySphere(ox, oy, oz, dx, dy, dz, X + fx * .02, ey + .04, Z + fz * .02,.13, maxDist), 'head');
+	test(rayCapsule(ox, oy, oz, dx, dy, dz, X, ey - .16, Z, X, ey - .48, Z, .21, maxDist), 'chest');
+	test(rayCapsule(ox, oy, oz, dx, dy, dz, X, ey - .5, Z, X, ey - .78, Z, .18, maxDist), 'stomach');
 	for (let s = -1; s <= 1; s += 2) {
-		const sx = X + rx * 0.24 * s, sz = Z + rz * 0.24 * s, lx = X + rx * 0.1 * s, lz = Z + rz * 0.1 * s;
-		test(rayCapsule(ox, oy, oz, dx, dy, dz, sx, ey - 0.2, sz, sx + fx * 0.25, ey - 0.42, sz + fz * 0.25, 0.07, maxDist), 'arm');
-		test(rayCapsule(ox, oy, oz, dx, dy, dz, lx, ey - 0.82, lz, lx, t.pos.y + 0.08, lz, 0.09, maxDist), 'leg');
+		const sx = X + rx * .24 * s, sz = Z + rz * .24 * s, lx = X + rx * .1 * s, lz = Z + rz * .1 * s;
+		test(rayCapsule(ox, oy, oz, dx, dy, dz, sx, ey - .2, sz, sx + fx * .25, ey - .42, sz + fz * .25,.07, maxDist), 'arm');
+		test(rayCapsule(ox, oy, oz, dx, dy, dz, lx, ey - .82, lz, lx, t.pos.y + .08, lz, .09, maxDist), 'leg');
 	}
 	return best;
 }
@@ -99,7 +99,7 @@ export function applyHit(state, shooter, target, group, dmg, dist, w) {
 	target.hurtT = state.time; target.hurtYaw = Math.atan2(-(shooter.pos.x - target.pos.x), -(shooter.pos.z - target.pos.z));
 	state.shots.hits++; state.spottedT[shooter.id] = state.time; state.spottedT[target.id] = state.time;
 	if (group === 'head') state.shots.heads++;
-	pushFx(state, 6, target.pos.x, target.pos.y + 1, target.pos.z, 0, 0, 0, target.id);
+	pushFx(state, 6, target.pos.x, target.pos.y + 1, target.pos.z, 0,0,0, target.id);
 	const killed = target.hp <= 0;
 	if (killed) {
 		target.hp = 0; target.alive = false; target.deaths++;
@@ -125,7 +125,7 @@ function finishReload(a) {
 export function switchWeapon(a, idx) {
 	if (idx < 0 || idx > 2 || !a.weapons[idx] || idx === a.active) return;
 	a.lastWeapon = a.active; a.active = idx;
-	a.switchT = 0.4; a.reloadT = 0; a.reloadShell = 0; a.scoped = false; a.scopeLevel = 0;
+	a.switchT = .4; a.reloadT = 0; a.reloadShell = 0; a.scoped = false; a.scopeLevel = 0;
 	a.shotsFired = 0; a.recoil.pitch = 0; a.recoil.yaw = 0; a.spreadBloom = 0; a.grenadeMode = false;
 }
 
@@ -145,12 +145,12 @@ function firePellet(state, a, w, spread, tracer) {
 
 function fireKnife(state, a, w) {
 	eyePos(a, _eye); viewDir(a, _dir);
-	a.nextFireT = state.time + 0.55; a.shotsFired++;
+	a.nextFireT = state.time + .55; a.shotsFired++;
 	for (const t of state.agents) {
 		if (t === a || !t.alive || t.team === a.team) continue;
 		const dx = t.pos.x - (_eye.x + _dir.x), dy = t.pos.y + 1 - (_eye.y + _dir.y), dz = t.pos.z - (_eye.z + _dir.z);
 		if (dx * dx + dy * dy + dz * dz > 1.2) continue;
-		const behind = -Math.sin(t.yaw) * (a.pos.x - t.pos.x) - Math.cos(t.yaw) * (a.pos.z - t.pos.z) < -0.4;
+		const behind = -Math.sin(t.yaw) * (a.pos.x - t.pos.x) - Math.cos(t.yaw) * (a.pos.z - t.pos.z) < -.4;
 		applyHit(state, a, t, 'chest', behind ? w.backstab : w.dmg, 1, w);
 		return;
 	}
@@ -163,7 +163,7 @@ export function tryFire(state, a, held, edge) {
 	const am = a.ammo[activeId(a)];
 	if (a.reloadShell > 0 && am.mag > 0) a.reloadShell = 0;
 	if (a.reloadT > 0 || a.reloadShell > 0) return;
-	if (am.mag <= 0) { a.dryT = state.time; a.nextFireT = state.time + 0.25; startReload(a); return; }
+	if (am.mag <= 0) { a.dryT = state.time; a.nextFireT = state.time + .25; startReload(a); return; }
 	am.mag--;
 	a.nextFireT = state.time + 60 / w.rpm;
 	state.shots.fired++;
@@ -171,9 +171,9 @@ export function tryFire(state, a, held, edge) {
 	applyRecoil(state, a, w);
 	eyePos(a, _eye);
 	_right.set(Math.cos(a.yaw), 0, -Math.sin(a.yaw));
-	viewDir(a, _muz).multiplyScalar(0.62).add(_eye).addScaledVector(_right, 0.12); _muz.y -= 0.1;
-	pushFx(state, 1, _muz.x, _muz.y, _muz.z, 0, 0, 0, 0);
-	pushFx(state, 4, _muz.x - _right.x * 0.04, _muz.y, _muz.z - _right.z * 0.04, _right.x, 0, _right.z, 0);
+	viewDir(a, _muz).multiplyScalar(.62).add(_eye).addScaledVector(_right, .12); _muz.y -= .1;
+	pushFx(state, 1, _muz.x, _muz.y, _muz.z, 0,0,0,0);
+	pushFx(state, 4, _muz.x - _right.x * .04, _muz.y, _muz.z - _right.z * .04, _right.x, 0, _right.z, 0);
 	for (let i = 0; i < w.pellets; i++) firePellet(state, a, w, spread, i === 0 && (w.pellets > 1 || state.shots.fired % 2 === 0));
 	pushNoise(state, a.pos.x, a.pos.y, a.pos.z, w.noise, a.team, 1);
 	if (am.mag === 0 && am.reserve > 0) startReload(a);
@@ -190,10 +190,10 @@ export function updateWeapons(state, dt) {
 			if (am.mag < w.mag && am.reserve > 0) { am.mag++; am.reserve--; if (am.mag < w.mag && am.reserve > 0) a.reloadShell = w.reload; }
 		}
 		if (a.switchT > 0) a.switchT -= dt;
-		if (state.time - a.lastShotT > 0.12) {
+		if (state.time - a.lastShotT > .12) {
 			const k = Math.exp(-7 * dt);
 			a.recoil.pitch *= k; a.recoil.yaw *= k;
-			if (Math.abs(a.recoil.pitch) < 0.0008) a.shotsFired = 0;
+			if (Math.abs(a.recoil.pitch) < .0008) a.shotsFired = 0;
 		}
 		a.spreadBloom *= Math.exp(-5 * dt);
 	}

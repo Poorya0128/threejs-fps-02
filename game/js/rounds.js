@@ -7,14 +7,14 @@ import { giveWeapon } from './weapons.js';
 
 export const banner = (state, text, sub = '') => { state.banner = { text, sub, t: state.time }; };
 const alive = (state, team) => { let n = 0; for (const a of state.agents) if (a.alive && a.team === team) n++; return n; };
-const SPAWN_OFF = [[0, 0], [-1.5, 2], [-1.5, -2], [1.5, 2.5], [1.5, -2.5]];
+const SPAWN_OFF = [[0,0], [-1.5,2], [-1.5,-2], [1.5,2.5], [1.5,-2.5]];
 
 function resetAgents(state) {
 	const n = { strand: 0, bastion: 0 };
 	for (const a of state.agents) {
 		const sp = state.map.spawns[a.team], o = SPAWN_OFF[n[a.team]++ % 5], sx = a.team === 'strand' ? 1 : -1;
 		if (!a.alive) { a.weapons.length = 0; a.armor = 0; a.helm = false; a.hasCutters = false; a.nades.shard = a.nades.veil = a.nades.glare = 0; giveWeapon(a, 'cutlass'); giveWeapon(a, 'wren'); }
-		a.pos.set(sp[0] + o[0] * sx, 0, sp[1] + o[1]); a.prevPos.copy(a.pos); a.vel.set(0, 0, 0);
+		a.pos.set(sp[0] + o[0] * sx, 0, sp[1] + o[1]); a.prevPos.copy(a.pos); a.vel.set(0,0,0);
 		a.yaw = a.team === 'strand' ? -Math.PI / 2 : Math.PI / 2; a.pitch = 0;
 		Object.assign(a, { alive: true, hp: 100, roundKills: 0, crouch: 0, flashT: 0, plantT: 0, defuseT: 0, spreadBloom: 0, shotsFired: 0, reloadT: 0, reloadShell: 0, scoped: false, scopeLevel: 0, grenadeMode: false, hasFuse: false });
 		a.recoil.pitch = a.recoil.yaw = 0;

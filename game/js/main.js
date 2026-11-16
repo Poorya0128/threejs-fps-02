@@ -25,7 +25,7 @@ import { applyScenario } from './scenarios.js';
 
 const q = new URLSearchParams(location.search);
 const AUTOPLAY = q.get('autoplay') === '1', SCENARIO = q.get('scenario'), CAM = q.get('cam');
-const SPEED = clamp(Number(q.get('speed') ?? 1), 1, 64), SEED = Number(q.get('seed') ?? 1337), DRAW = q.get('norender') !== '1';
+const SPEED = clamp(Number(q.get('speed') ?? 1), 1,64), SEED = Number(q.get('seed') ?? 1337), DRAW = q.get('norender') !== '1';
 const status = window.__saltline = { ready: false, round: 1, phase: 'buy', score: null, roundsPlayed: 0, matchOver: false, lastWinReason: null, scenarioReady: false, stats: { drawCalls: 0, triangles: 0, frameMs: 0 } };
 
 const state = createState(SEED, MAP, mulberry32(SEED));
@@ -68,8 +68,8 @@ function controlPlayer(dt) {
 	if (!p.alive) { if (inp.jump && !prevJump) cycleSpectate(state); prevJump = inp.jump; return; }
 	const frozen = state.phase === 'buy';
 	setCrouch(state, p, inp.crouch, dt);
-	let speed = maxSpeed(p) * (inp.walk ? MOVE.walkMul : 1) * (p.crouch > 0.5 ? MOVE.crouchMul : 1);
-	if (frozen || !wishDir(p.yaw, inp.f, inp.b, inp.l, inp.r, _wd)) { speed = 0; _wd.set(0, 0, 0); }
+	let speed = maxSpeed(p) * (inp.walk ? MOVE.walkMul : 1) * (p.crouch > .5 ? MOVE.crouchMul : 1);
+	if (frozen || !wishDir(p.yaw, inp.f, inp.b, inp.l, inp.r, _wd)) { speed = 0; _wd.set(0,0,0); }
 	stepAgent(state, p, _wd.x, _wd.z, speed, inp.jump && !frozen, dt);
 	if (inp.interact && state.phase === 'live') plantCharge(state, p, dt); else p.plantT = 0;
 	if (inp.interact && state.phase === 'planted') defuseCharge(state, p, dt); else p.defuseT = 0;
@@ -97,7 +97,7 @@ if (CAM) { state.buyOpen = false; state.scenarioDone = true; }
 const next = DRAW ? requestAnimationFrame : (f) => setTimeout(() => f(performance.now()), 1); // tests without drawing are not tied to the display
 function frame(now) {
 	next(frame);
-	const dt = Math.min((now - last) / 1000, 0.1); last = now;
+	const dt = Math.min((now - last) / 1000,.1); last = now;
 	const p = state.player;
 	if (!state.paused && !state.scenarioDone) {
 		if (state.input.locked && p.alive) applyLook(state.input, p);
@@ -120,7 +120,7 @@ function frame(now) {
 	const view = spectateTarget(state) || p, title = !menu.title.hidden;
 	if (camView) { p.yaw = camView.yaw; p.pitch = camView.pitch; p.pos.set(camView.x, camView.y - p.eyeHeight, camView.z); p.prevPos.copy(p.pos); }
 	const t0 = performance.now();
-	if (title) R.orbit(now / 1000); else R.placeCamera(view, camView ? 1 : clamp(acc / TICK, 0, 1), INPUT.fov);
+	if (title) R.orbit(now / 1000); else R.placeCamera(view, camView ? 1 : clamp(acc / TICK, 0,1), INPUT.fov);
 	vm.group.visible = view === p && p.alive && !title;
 	if (vm.group.visible) vm.update(state, R.camera, state.scenarioDone ? 0 : dt);
 	chars.update(state, dt);

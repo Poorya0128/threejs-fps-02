@@ -44,15 +44,15 @@ export function buildLighting(renderer, scene) {
 	scene.add(sun, sun.target);
 	scene.add(new HemisphereLight(RENDER.hemiSky, RENDER.hemiGround, RENDER.hemiIntensity));
 	scene.fog = new FogExp2(RENDER.fogColor, RENDER.fogDensity);
-	scene.add(new Mesh(new SphereGeometry(450, 32, 16), skyMaterial(dir)));
+	scene.add(new Mesh(new SphereGeometry(450,32,16), skyMaterial(dir)));
 	const env = new Scene(), pm = new PMREMGenerator(renderer);
-	env.add(new Mesh(new SphereGeometry(50, 32, 16), skyMaterial(dir)));
-	const floor = new Mesh(new CircleGeometry(60, 24), new MeshBasicMaterial({ color: 0x5c5048 }));
+	env.add(new Mesh(new SphereGeometry(50,32,16), skyMaterial(dir)));
+	const floor = new Mesh(new CircleGeometry(60,24), new MeshBasicMaterial({ color: 0x5c5048 }));
 	floor.rotation.x = -Math.PI / 2; floor.position.y = -2; env.add(floor);
-	scene.environment = pm.fromScene(env, 0.03).texture;
+	scene.environment = pm.fromScene(env, .03).texture;
 	scene.environmentIntensity = RENDER.envIntensity;
 	pm.dispose();
-	const flash = new PointLight(0xffc06a, 0, 12, 2);
+	const flash = new PointLight(0xffc06a, 0,12,2);
 	scene.add(flash);
 	return { sun, flash, dir };
 }
