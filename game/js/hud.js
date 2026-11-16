@@ -29,8 +29,7 @@ export function createHud(map) {
 	}
 	Object.assign(g, { font: 'bold 22px sans-serif', textAlign: 'center', textBaseline: 'middle', strokeStyle: AMBER, fillStyle: AMBER, lineWidth: 2 }); g.setLineDash([5, 4]);
 	for (const [z, l] of [[map.zones.sitePans, 'A'], [map.zones.siteBoiler, 'B']]) { g.beginPath(); g.arc(X(z.cx), Z(z.cz), z.r * PX, 0, 7); g.stroke(); g.fillText(l, X(z.cx), Z(z.cz)); }
-	const cone = rc.createRadialGradient(R, R, 0, R, R, R);
-	cone.addColorStop(0, INK + '.3)'); cone.addColorStop(1, INK + '0)'); rc.textAlign = 'center';
+	rc.textAlign = 'center';
 	const shape = (c, ...p) => { rc.fillStyle = c; rc.beginPath(); for (let i = 0; i < p.length; i += 2) rc.lineTo(p[i], p[i + 1]); rc.fill(); };
 	const ring = (x, z, r, fill) => { rc.beginPath(); rc.arc(x, z, r, 0, 7); if (fill) { rc.fillStyle = fill; rc.fill(); } else rc.stroke(); };
 	function drawRadar(state, v) {
@@ -48,9 +47,7 @@ export function createHud(map) {
 			else if (state.time - state.spottedT[a.id] < 2.5) shape('#ff5a4a', x, z - 6, x + 5, z, x, z + 6, x - 5, z);
 		}
 		rc.restore();
-		rc.fillStyle = cone; rc.beginPath(); rc.moveTo(R, R); rc.arc(R, R, R, -Math.PI / 2 - .6, -Math.PI / 2 + .6); rc.fill();
 		shape('#fff', R, R - 8, R + 5.5, R + 6, R, R + 2.5, R - 5.5, R + 6);
-		rc.font = 'bold 11px sans-serif'; rc.fillStyle = AMBER; rc.fillText('N', R + Math.sin(v.yaw) * (R - 11), R - Math.cos(v.yaw) * (R - 11) + 4);
 	}
 	const card = (p, [id, key, note]) => {
 		const own = owns(p, id), off = p.money < priceOf(id) || (id === 'cutters' && p.team !== 'bastion');
@@ -71,11 +68,7 @@ export function createHud(map) {
 			const w = activeWeapon(v), am = v.ammo[activeId(v)], nade = v.grenadeMode, f = state.fuse, t = Math.max(0, Math.ceil(state.roundT)), phase = state.phase;
 			text('hp', Math.ceil(v.hp)); width('hpbar', Math.ceil(v.hp)); cls('hpbar', 'low', v.hp <= 30);
 			text('ar', Math.round(v.armor)); width('arm', Math.round(v.armor)); text('helm', v.helm ? 'HELM' : '');
-			const d = v.money - (last.cash ?? v.money);
-			if (changed('cash', v.money)) {
-				E.cash.textContent = `$${v.money}`;
-				if (d) { E.dCash.textContent = `${d > 0 ? '+' : '−'}$${Math.abs(d)}`; E.dCash.className = ''; void E.dCash.offsetWidth; E.dCash.className = d > 0 ? 'up' : 'dn'; }
-			}
+			text('cash', `$${v.money}`);
 			const mags = nade ? -1 : Math.ceil(am.reserve / w.mag);
 			html('ammo', nade ? `${v.nades[v.nadeSel]}<small>LMB THROW · RMB LOB</small>` : `${am.mag}<small>/ ${w.mag}</small>`);
 			if (changed('mags', mags)) E.mags.innerHTML = mags < 0 ? '' : `<span>×${mags}</span><b>${'<i></i>'.repeat(Math.min(mags, 8))}</b>`;

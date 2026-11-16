@@ -25,7 +25,7 @@ const slots = (u0, u1, v0, v1, n) => Array.from({ length: n }, (_, k) => { const
 
 function optic(B, kind, z, y) {
 	if (kind === 'scope') {
-		lat(B, FIN.P, 0, y + .045, z + .14, [0,0,.022,0,.022,.06,.015,.09,.015,.2,.02,.24,.02,.3,.018,.31,0,.31], 1,24);
+		lat(B, FIN.P, 0, y + .045, z + .14, [0,.008,.016,.008,.016,0,.022,0,.022,.06,.015,.09,.015,.2,.02,.24,.02,.3,.018,.31,.015,.31,.015,.302,0,.302], 1,32);
 		for (const zz of [z + .07, z - .08]) box(B, FIN.K, -.012, y, zz, .012, y + .03, zz - .02,1);
 		lat(B, FIN.K, .024, y + .045, z - .01, [0,0,.009,0,.009,.02,0,.02], 1,12);
 		return y + .045;
@@ -37,13 +37,13 @@ function optic(B, kind, z, y) {
 		return y + .033;
 	}
 	box(B, FIN.K, -.013, y, z, .013, y + .01, z - .05,1);
-	lat(B, FIN.K, 0, y + .03, z, [.023,0,.023,.05,.02,.052], 1,20);
+	lat(B, FIN.K, 0, y + .03, z, [.019,0,.023,0,.023,.05,.021,.053,.019,.053,.019,0], 1,28);
 	return y + .03;
 }
 
-// Hand placement: grip front/back edges [z, y, z, y], grip and frame half widths, web and first-finger heights.
-const PGRIP = { f: [-.016,-.03,-.005,-.12], b: [.012,-.01,.03,-.115], hw: .017, side: .014, top: -.014, fy: -.052 };
-const LGRIP = { f: [.008,-.03,.024,-.124], b: [.035,-.02,.058,-.118], hw: .016, side: .0155, top: -.026, fy: -.062 };
+// Hand placement: grip front/back edges [z, y, z, y], grip and frame half widths, web and first-finger heights, trigger [y, z].
+const PGRIP = { f: [-.016,-.03,-.005,-.12], b: [.012,-.01,.03,-.115], hw: .017, side: .014, top: -.014, fy: -.052, trig: [-.027,-.033] };
+const LGRIP = { f: [.008,-.03,.024,-.124], b: [.035,-.02,.058,-.118], hw: .016, side: .0155, top: -.026, fy: -.062, trig: [-.032,-.017] };
 function pistol(o) {
 	const B = new Bld(), K = new Bld(), A = new Bld(), L = o.len;
 	box(B, o.frame, -.014,-.012,.035,.014,.012, -L + .02,1);
@@ -73,7 +73,6 @@ function longGun(o) {
 	rail(B, .064, zf + .02, -h1 + .01);
 	rail(B, .064, z0 - .01, zf + .02);
 	lat(B, FIN.M, 0, by, bz + .01, [o.bore, 0, o.bore, o.barrel, 0, o.barrel], 2,16);
-	if (o.flute) for (let k = 0; k < 6; k++) box(B, FIN.R, -o.bore - .0005, by - .0015, bz - .04 - k * .04, o.bore + .0005, by + .0015, bz - .065 - k * .04);
 	lat(B, FIN.M, 0, by, bz - o.barrel + .01, [.013,0,.013,.012,.011,.014,.011,.02,.013,.022,.013,.05,.009,.055,0,.055], 2,16);
 	box(B, FIN.M, -.012, by - .014, bz, .012, by + .016, bz - .025);
 	const S = (pts, f = FIN.P, holes = []) => ext(B, f, .034, pts.map((v, i) => (i % 2 ? v : -s0 - v)), holes.map((h) => h.map((v, i) => (i % 2 ? v : -s0 - v))));
@@ -95,14 +94,16 @@ const SPECS = {
 	breaker: (fp) => longGun({ fp, recv: .2, hg: .36, barrel: .12, bore: .014, stock: 'tube', accent: 0x333538, hgColor: 0x5a3c26 }),
 	talon: (fp) => longGun({ fp, recv: .26, hg: .3, barrel: .14, bore: .0095, mag: 'curved', stock: 'tube', optic: 'dot', accent: 0x7a6c56, hgColor: 0x7a6c56 }),
 	gavel: (fp) => longGun({ fp, recv: .12, hg: .32, barrel: .1, bore: .0095, mag: 'box', bullpup: true, optic: 'holo', opticZ: -.12, accent: 0x4c5a66 }),
-	longbow: (fp) => longGun({ fp, recv: .3, hg: .28, barrel: .34, bore: .012, mag: 'box', stock: 'chassis', optic: 'scope', opticZ: -.02, bolt: true, flute: true, accent: 0x55604a }),
+	longbow: (fp) => longGun({ fp, recv: .3, hg: .28, barrel: .34, bore: .012, mag: 'box', stock: 'chassis', optic: 'scope', opticZ: -.02, bolt: true, accent: 0x55604a }),
 };
 
 const reticle = new MeshBasicMaterial({ transparent: true, blending: AdditiveBlending, depthWrite: false, color: new Color(4,1.4,1.2), map: canvasTex(64, (x) => {
 	const g = x.createRadialGradient(32,32,0,32,32,8);
 	g.addColorStop(0, '#ff5a3c'); g.addColorStop(.4, 'rgba(255,60,40,.9)'); g.addColorStop(1, 'rgba(255,40,20,0)'); x.fillStyle = g; x.fillRect(0,0,64,64);
 }) });
-const lens = new MeshStandardMaterial({ color: 0x8aa0d0, metalness: 1, roughness: .06, transparent: true, opacity: .28, envMapIntensity: 2, side: DoubleSide });
+// Glass: see-through on dot sights, coated and opaque in the scope.
+const lens = new MeshStandardMaterial({ color: 0x9ab4e0, metalness: 1, roughness: .05, transparent: true, opacity: .32, envMapIntensity: 2, side: DoubleSide });
+const coat = new MeshStandardMaterial({ color: 0x4a6a9a, metalness: 1, roughness: .08, envMapIntensity: 2.4 });
 
 // lod: one merged mesh for soldiers; otherwise animated slide and magazine, glass optics.
 export function buildWeapon(id, lod = false) {
@@ -111,8 +112,8 @@ export function buildWeapon(id, lod = false) {
 	mk(s.B);
 	const slide = mk(s.K), mag = mk(s.A), muzzle = new Object3D();
 	if (!lod && s.optic) {
-		const sc = s.optic === 'scope', z0 = s.oz + (sc ? .141 : -.001), z1 = z0 - (sc ? .312 : s.optic === 'holo' ? .088 : .048);
-		for (const z of sc ? [z0, z1] : [z1]) { const l = new Mesh(new CircleGeometry(sc ? .019 : .02,20), lens); l.position.set(0, s.sight, z); g.add(l); }
+		const sc = s.optic === 'scope', z0 = s.oz + (sc ? .1325 : -.001), z1 = sc ? s.oz - .1625 : z0 - (s.optic === 'holo' ? .088 : .051);
+		for (const z of sc ? [z0, z1] : [z1]) { const l = new Mesh(new CircleGeometry(sc ? .0155 : .019,24), sc ? coat : lens); l.position.set(0, s.sight, z); g.add(l); }
 		if (!sc) { const r = new Mesh(new PlaneGeometry(.03,.03), reticle); r.position.set(0, s.sight, (z0 + z1) / 2); r.renderOrder = 2; g.add(r); }
 	}
 	muzzle.position.fromArray(s.muz); g.add(muzzle);

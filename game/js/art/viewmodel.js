@@ -9,40 +9,45 @@ import { TEAM_LOOK, WEAPONS } from '../config.js';
 const HOLD = { pistol: [.075, -.105, -.43], rifle: [.11, -.128, -.37] }, ADS = [0, -.074, -.22];
 export const GLOVE = lin(0xa48a62);
 const toAds = (hip, k, a) => hip[k] + (ADS[k] - hip[k]) * a;
-const _m = new Matrix4(), _n = new Matrix4(), _q = new Quaternion(), _s = new Vector3(), P = (x, y, z) => new Vector3(x, y, z);
+const _m = new Matrix4(), _q = new Quaternion(), _v = new Vector3(), _s = new Vector3(), _x = new Vector3(1, 0, 0), P = (x, y, z) => new Vector3(x, y, z);
 const seg = (B, a, b, r, col) => B.add(new CapsuleGeometry(r, a.distanceTo(b), 3, 10), along(a, b), 1, col);
+const pad = (B, x, y, z, sx, sy, sz, rx, col) => B.add(new SphereGeometry(1, 14, 10), _m.compose(_v.set(x, y, z), _q.setFromAxisAngle(_x, rx), _s.set(sx, sy, sz)), 1, col);
 const se = (d, a, b, p) => { const c = Math.cos(d / 57.3), s = Math.sin(d / 57.3); return [a * Math.sign(c) * Math.abs(c) ** p, b * Math.sign(s) * Math.abs(s) ** p]; };
 const at = (L, y) => L[0] + (L[2] - L[0]) * (y - L[1]) / (L[3] - L[1]);
-// The four fingers as one block: a flattened tube h tall round a grip section (superellipse a, b, power p) from d0° to d1°,
-// with rounded ends; m places it, local y along the grip.
-function fingers(B, a, b, p, d0, d1, h, m, col) {
-	const pts = Array.from({ length: 9 }, (_, k) => { const [x, z] = se(d0 + (d1 - d0) * k / 8, a + .005, b + .005, p); return new Vector3(x, 0, z); });
-	m.scale(_s.set(1, h / .034, 1)); // the inner half of the 17 mm tube sits inside the grip
-	B.add(new TubeGeometry(new CatmullRomCurve3(pts), 24, .017, 12), m, 1, col);
-	for (const q of [pts[0], pts[8]]) B.add(new SphereGeometry(.017, 12, 8), _n.makeTranslation(q).premultiply(m), 1, col);
+// Finger or thumb: a tube through pts with a round tip. Fingers are 17 mm thick and 16 mm apart, so they touch.
+const R_F = .0085, GAP = .016;
+function finger(B, pts, col, r = R_F) {
+	B.add(new TubeGeometry(new CatmullRomCurve3(pts), 16, r, 8), _m.identity(), 1, col);
+	for (const q of [pts[0], pts.at(-1)]) B.add(new SphereGeometry(r, 10, 8), _m.makeTranslation(q), 1, col);
 }
+// Six points from d0° to d1° on a superellipse section (a, b, p), placed by pt(u, v, j).
+const arc = (d0, d1, a, b, p, pt) => Array.from({ length: 6 }, (_, j) => pt(...se(d0 + (d1 - d0) * j / 5, a, b, p), j));
 
-// Hands from the weapon's grip data: right palm behind the grip, fingers round its front below the guard, thumb along the
-// frame; left hand round the handguard or over the right fingers on a pistol. Returns builders and wrist points.
+// Hands from the weapon's grip data: right palm and three fingers round the grip, index on the trigger, thumb along the
+// frame; left hand round the handguard or over the right hand. Each finger ends at its own angle, for its own length.
 export function buildHands(w, glove) {
 	const R = new Bld(), L = new Bld(), G = w.grip, zf = (y) => at(G.f, y), zb = (y) => at(G.b, y), zc = (y) => (zf(y) + zb(y)) / 2;
-	const hw = G.hw, ym = G.fy - .02, y0 = G.fy + .006, h = .074, dz = (zb(ym) - zf(ym)) / 2, xT = -G.side - .011, yT = G.top + .01;
-	const rake = -Math.atan2(zc(y0 - .1) - zc(y0), .1), grip = () => _m.makeRotationX(rake).setPosition(0, y0 - h / 2, zc(y0 - h / 2));
+	const hw = G.hw, ym = G.fy - .022, [ty, tz] = G.trig, xT = -G.side - R_F, yT = G.top + .009, rake = -Math.atan2(zb(G.top - .1) - zb(G.top), .1);
+	const wrap = (y, out, d0, d1) => arc(d0, d1, hw + out, (zb(y) - zf(y)) / 2 + out, .6, (x, z, j) => P(x, y - j * .0015, zc(y) + z));
 	seg(R, P(.002, G.top - .012, zb(G.top - .012) + .012), P(.003, G.fy - .05, zb(G.fy - .05) + .012), .016, glove);
-	fingers(R, hw, dz, .6, 42, -168, h, grip(), glove);
-	seg(R, P(xT + .002, yT, zb(G.top) - .002), P(xT + .001, yT + .003, zf(G.top) - .03), .0095, glove);
+	pad(R, hw * .6, ym, zb(ym) - .002, .016, .04, .022, rake, glove);
+	pad(R, -hw * .5, G.top - .016, zb(G.top - .016) + .004, .011, .024, .016, rake, glove);
+	for (let k = 0; k < 3; k++) finger(R, wrap(G.fy - k * GAP, R_F * .85, 35, [-172, -165, -142][k]), glove);
+	finger(R, [P(hw + R_F * .8, ty + .004, zb(G.top) - .008), P(hw + R_F * .8, ty + .001, tz + .024), P(hw * .5 + .004, ty - .003, tz + .008), P(.004, ty - .007, tz - .004)], glove);
+	finger(R, [P(-hw * .6, G.top + .001, zb(G.top) + .006), P(xT + .002, yT, zb(G.top) - .004), P(xT, yT + .002, zf(G.top) - .006), P(xT + .002, yT + .002, zf(G.top) - .025)], glove, .0092);
 	const rw = [hw * .4, ym - .01, zb(ym) + .036];
 	seg(R, P(.004, ym, zb(ym) + .014), P(...rw), .021, glove);
 	let lw;
 	if (w.left) {
 		const z = w.left[2], [cy, rx, ry, p] = w.hg, [px, py] = se(-135, rx + .013, ry + .013, p);
-		seg(L, P(px, cy + py, z + .042), P(px + .006, cy + py, z - .03), .017, glove);
-		fingers(L, rx, ry, p, -150, 45, h, _m.makeRotationX(-Math.PI / 2).setPosition(0, cy, z), glove);
-		seg(L, P(-rx - .012, cy - ry * .45, z + .045), P(-rx - .008, cy + ry * .12, z - .036), .0095, glove);
-		lw = [-rx - .008, cy - ry - .004, z + .062]; seg(L, P(px, cy + py, z + .04), P(...lw), .021, glove);
+		pad(L, px, cy + py, z + .006, .02, .016, .04, 0, glove);
+		for (let k = 0; k < 4; k++) finger(L, arc(-150, [52, 58, 48, 30][k], rx + R_F * .85, ry + R_F * .85, p, (x, y, j) => P(x, cy + y, z - .028 + k * GAP + j * .001)), glove);
+		finger(L, [P(px, cy + py + .004, z + .03), P(-rx - .01, cy - ry * .3, z + .012), P(-rx - .009, cy, z - .01), P(-rx - .008, cy + ry * .15, z - .03)], glove, .0092);
+		lw = [-rx - .008, cy - ry - .004, z + .062]; seg(L, P(px, cy + py, z + .03), P(...lw), .021, glove);
 	} else {
-		fingers(L, hw + .02, dz + .02, .6, 165, 284, h, grip(), glove);
-		seg(L, P(-hw - .02, G.top - .02, zb(G.top) + .004), P(xT - .002, G.top - .018, zf(G.top) - .028), .0095, glove);
+		pad(L, -hw - .022, ym, zc(ym) + .006, .011, .034, .026, rake, glove);
+		for (let k = 0; k < 4; k++) finger(L, wrap(G.fy + .006 - k * GAP, R_F * 2.7, 165, [282, 286, 280, 268][k]), glove);
+		finger(L, [P(-hw - .02, G.top - .024, zb(G.top) + .004), P(xT - .006, G.top - .02, zc(G.top)), P(xT - .004, G.top - .02, zf(G.top) - .008), P(xT - .002, G.top - .02, zf(G.top) - .026)], glove, .0092);
 		lw = [-hw - .024, G.fy - .05, zb(G.fy - .05) + .02]; seg(L, P(-hw - .02, ym - .02, zc(ym) + .01), P(...lw), .02, glove);
 	}
 	return { R, L, rw, lw };
