@@ -2,7 +2,7 @@
 // code path: fire, computeSpread, applyRecoil, reload, switch, traceShot,
 // applyHit. Sounds and visuals are driven by state (fxEvents, lastHit).
 import * as THREE from 'three';
-import { WEAPONS, HIT, ARMOR_RATIO, MOVE } from './config.js';
+import { WEAPONS, HIT, ARMOR_RATIO, MOVE, ECON } from './config.js';
 import { clamp, rayAABB, raySphere, rayCapsule, _v0, _v1, _v3 } from './math.js';
 import { pushFx } from './state.js';
 
@@ -38,8 +38,8 @@ function maxSpeed(a) {
   return s;
 }
 
-// Spread in radians, recomputed every tick (PLAN.md §7): base (crouch or
-// scoped) + move + air + bloom. Stopping to aim pays.
+// Spread in radians, recomputed every tick (§7): base (crouch/scope)
+// + move + air + bloom. Stopping to aim pays.
 export function computeSpread(a) {
   const w = activeWeapon(a);
   if (w.cls === 'knife') return 0;
@@ -139,6 +139,8 @@ export function applyHit(state, shooter, target, group, dmg, dist, w) {
   if (killed) {
     target.hp = 0; target.alive = false; target.deaths++;
     shooter.kills++; state.shots.kills++;
+    // Kill reward by weapon class (PLAN.md §4.4).
+    shooter.money = Math.min(ECON.cap, shooter.money + (ECON.kill[w.cls] || 0));
     state.killfeed.push({ text: `${shooter.name} ▸ ${target.name} · ${w.name}`, head: group === 'head', t: state.time });
     if (state.killfeed.length > 5) state.killfeed.shift();
   }
@@ -176,10 +178,9 @@ export function switchWeapon(state, a, idx) {
   a.shotsFired = 0; a.recoil.pitch = 0; a.recoil.yaw = 0; a.spreadBloom = 0;
 }
 
-// One shot (or one pellet). The trace starts at the EYE — the crosshair is
-// the aim point — while the tracer starts at the muzzle. Tracing from the
-// muzzle biased every shot ~0.16 m low / 0.18 m right, enough to turn a
-// centred headshot into a chest hit.
+// One shot. The trace starts at the EYE (the crosshair is the aim point);
+ // the tracer starts at the muzzle. Tracing from the muzzle biased shots
+// ~0.16 m low / 0.18 m right — enough to turn a headshot into a chest hit.
 function firePellet(state, a, w, ex, ey, ez, mx, my, mz, spread, every3rd) {
   viewDir(a, _dir);
   if (spread > 0) {
@@ -214,7 +215,9 @@ function fireKnife(state, a) {
   a.nextFireT = state.time + 0.6;
 }
 
-function tryFire(state, a, held, edge) {
+// Shared fire path: player via updateWeapons, bots directly
+// with (held, edge) = (wantFire, wantFire).
+export function tryFire(state, a, held, edge) {
   const w = activeWeapon(a);
   if (w.cls === 'knife') {
     if (edge && state.time >= a.nextFireT) fireKnife(state, a);
@@ -289,7 +292,7 @@ export function updateWeapons(state, dt) {
     if (w.scope) { p.scopeLevel = (p.scopeLevel + 1) % 3; p.scoped = p.scopeLevel > 0; }
   }
   p.prevAlt = inp.alt;
-  if (!p.alive || p.switchT > 0) { inp.reload = false; inp.slot = 0; inp.lastWeapon = false; inp.wheel = 0; inp.fireEdge = false; return; }
+  if (!p.alive || p.switchT > 0 || state.phase === 'buy' || state.phase === 'post' || state.phase === 'matchEnd') { inp.reload = false; inp.slot = 0; inp.lastWeapon = false; inp.wheel = 0; inp.fireEdge = false; return; }
   if (inp.reload) startReload(state, p);
   tryFire(state, p, inp.fire, inp.fireEdge);
   inp.reload = false; inp.slot = 0; inp.lastWeapon = false; inp.wheel = 0; inp.fireEdge = false;

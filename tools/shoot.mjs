@@ -25,7 +25,7 @@ for (const [file, scenario] of SHOTS) {
   } catch { console.log(`FAIL ${scenario}: scenarioReady never became true`); failed = true; await page.close(); continue; }
   await page.evaluate(() => new Promise((ok) => requestAnimationFrame(() => requestAnimationFrame(ok))));
   let quality = 88, buf;
-  do { buf = await page.screenshot({ type: 'jpeg', quality }); quality -= 4; } while (buf.length > LIMIT && quality >= 50);
+  do { buf = await page.screenshot({ type: 'jpeg', quality, timeout: 120000 }); quality -= 4; } while (buf.length > LIMIT && quality >= 50);
   writeFileSync(join(ROOT, 'screenshots', `${file}.jpg`), buf);
   const bad = errors.length || external.length || buf.length > LIMIT;
   if (bad) failed = true;

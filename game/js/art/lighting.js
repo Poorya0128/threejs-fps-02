@@ -1,7 +1,6 @@
 // SALTLINE art/lighting.js — sun, sky fill, image-based light (ART.md §3).
-// The M0 failure this fixes: a box's shadow side read almost black because
-// hemisphere 0.35 was the only fill. PMREM environment light is what lifts
-// shadowed faces to blue-grey, never black.
+// PMREM environment lifts shadowed faces to blue-grey, never black
+// (the M0 failure: hemisphere 0.35 was the only fill).
 import * as THREE from 'three';
 import { RENDER, PALETTE } from '../config.js';
 

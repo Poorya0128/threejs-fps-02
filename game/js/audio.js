@@ -1,6 +1,6 @@
-// SALTLINE audio.js — WebAudio synth, no files (PLAN.md §12b).
-// Buffers are generated once at boot; shots differ per weapon class.
-// update(state) polls sim state each frame and plays what changed.
+// SALTLINE audio.js — WebAudio synth, no files (§12b). Buffers are
+// generated once at boot; shots differ per weapon class. update(state)
+// polls sim state each frame and plays what changed.
 let ctx = null, master = null, noiseBuf = null;
 const seen = { shots: 0, reload: 0, dry: 0, hitT: -1 };
 
@@ -89,5 +89,7 @@ export function createAudio() {
         }
       }
     },
+    // Pause-menu volume slider (M3): master gain, 0–1.
+    setVolume(v) { if (master) master.gain.value = v; },
   };
 }

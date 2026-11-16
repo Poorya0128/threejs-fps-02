@@ -27,19 +27,23 @@ export function createState(seed, map) {
     player, agents: [player],
     input: {
       f: false, b: false, l: false, r: false, jump: false, walk: false,
-      crouch: false, fire: false, alt: false, reload: false,
+      crouch: false, fire: false, alt: false, reload: false, interact: false,
+      scoreboard: false,
       fireEdge: false, slot: 0, lastWeapon: false, wheel: 0,
       lookDX: 0, lookDY: 0, locked: false,
     },
     phase: 'live', round: 1, roundT: ROUND.liveTime,
     score: { strand: 0, bastion: 0 }, roundsPlayed: 0, matchOver: false,
     lastWinReason: null, fuse: null, noise: [], killfeed: [],
+    difficulty: 'regular', autoplay: false, spectateIdx: -1,
+    lossStreak: { strand: 0, bastion: 0 }, banner: null, swapped: false,
+    scenarioDone: false,
     // Shot counters (exposed to tests via __saltline.shots).
     shots: { fired: 0, hits: 0, heads: 0, kills: 0 },
     // FX event ring buffer (weapons.js writes, art/fx.js drains).
     // {kind:0 tracer,1 flash,2 impact,3 spark,4 shell, x,y,z, dx,dy,dz, mat, head}
     fxEvents: [], fxHead: 0, fxTail: 0,
-    camOverride: null, paused: false, scenario: null,
+    paused: false,
   };
 }
 

@@ -1,6 +1,6 @@
-// SALTLINE art/geo.js — geometry kit (ART.md §4). Every box is bevelled:
-// hard 90-degree edges with flat shading are what make a scene look fake.
-// All world geometry is merged per material (draw-call budget, ART.md §12).
+// SALTLINE art/geo.js — geometry kit (ART.md §4). Every box is bevelled
+// (hard 90-degree edges + flat shading look fake). World geometry is
+// merged per material (draw-call budget, ART.md §12).
 import * as THREE from 'three';
 import { MATERIALS } from '../config.js';
 

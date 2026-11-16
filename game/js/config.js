@@ -39,11 +39,28 @@ export const MOVE = {
   stepNoiseStride: 0.38, landNoiseMinFall: 1.2,
 };
 
-// --- round / match (PLAN.md §4.3, used from M3; defined now so state is stable) ---
+// --- round / match (§4.3) ---
 export const ROUND = {
   buyTime: 12, liveTime: 105, fuseTime: 40, postTime: 5,
   winRounds: 7, swapAfter: 6,
   plantTime: 3.0, defuseTime: 7.0, defuseCuttersTime: 3.5,
+};
+
+// --- economy (PLAN.md §4.4) ---
+export const ECON = {
+  start: 900, cap: 12000,
+  winElim: 3000, winObjective: 3300,
+  loss: 1500, lossBonus: 400, lossMax: 3100,
+  kill: { pistol: 250, smg: 550, shotgun: 750, rifle: 250, marksman: 100, knife: 150 },
+  plant: 300, plantLossBonus: 600,
+};
+
+// --- bot skill presets (§9.2): reaction, aim error (rad), head chance,
+// burst length. Default Regular.
+export const BOT = {
+  recruit: { react: [0.45, 0.7], aimErr: 0.032, head: 0.05, burst: [2, 3] },
+  regular: { react: [0.2, 0.38], aimErr: 0.016, head: 0.15, burst: [3, 5] },
+  veteran: { react: [0.12, 0.22], aimErr: 0.01, head: 0.3, burst: [4, 6] },
 };
 
 // --- render / light (ART.md §2-3) ---
@@ -56,16 +73,16 @@ export const RENDER = {
   maxPointLights: 12,
 };
 
-// --- arsenal (PLAN.md §4.5). All weapon numbers live here, logic in weapons.js.
-// spread in radians: base(stand) | crouchMul | moveMul | airAdd | bloomPerShot.
-// kick pattern: [pitch, yaw] radians per shot index (original shapes).
+// --- arsenal (§4.5). Numbers here, logic in weapons.js.
+// spread: base(stand) | crouchMul | moveMul | airAdd | bloomPerShot.
+// kick: [pitch, yaw] radians per shot index.
 export const WEAPONS = {
   wren:    { name: 'WREN', cls: 'pistol', price: 0, dmg: 28, rpm: 380, auto: false, mag: 15, reserve: 45, reload: 1.1, pellets: 1, falloff: 0.92, noise: 30, spread: [0.004, 0.7, 1.0, 0.03, 0.006], kick: [[0.006, 0], [0.007, 0.001], [0.007, -0.001], [0.008, 0]] },
   mako:    { name: 'MAKO .45', cls: 'pistol', price: 700, dmg: 52, rpm: 220, auto: false, mag: 7, reserve: 28, reload: 1.4, pellets: 1, falloff: 0.9, noise: 32, spread: [0.006, 0.7, 1.8, 0.035, 0.01], kick: [[0.011, 0], [0.012, 0.002], [0.012, -0.002], [0.013, 0]] },
   hornet:  { name: 'HORNET', cls: 'smg', price: 1250, dmg: 24, rpm: 850, auto: true, mag: 30, reserve: 120, reload: 1.6, pellets: 1, falloff: 0.8, noise: 35, spread: [0.006, 0.7, 0.6, 0.025, 0.003], kick: [[0.004, 0], [0.004, 0.001], [0.005, -0.001], [0.005, 0.001], [0.005, -0.002], [0.006, 0.002], [0.006, -0.001], [0.006, 0.001]] },
   breaker: { name: 'BREAKER', cls: 'shotgun', price: 1100, dmg: 9, rpm: 70, auto: false, mag: 6, reserve: 30, reload: 0.6, shell: true, pellets: 9, falloff: 0.75, noise: 40, spread: [0.02, 0.8, 1.0, 0.04, 0], kick: [[0.02, 0]] },
-  talon:   { name: 'TALON', cls: 'rifle', price: 2700, dmg: 34, rpm: 600, auto: true, mag: 30, reserve: 90, reload: 2.2, pellets: 1, falloff: 0.9, noise: 45, spread: [0.0035, 0.7, 1.0, 0.03, 0.004], kick: [[0.007, 0], [0.008, 0.001], [0.009, -0.001], [0.01, 0.002], [0.011, -0.002], [0.012, 0.003], [0.012, -0.003], [0.013, 0.004], [0.013, -0.004], [0.014, 0.005], [0.014, -0.005], [0.015, 0.006], [0.015, -0.006], [0.016, 0.004], [0.016, -0.004], [0.017, 0]] },
-  gavel:   { name: 'GAVEL', cls: 'rifle', price: 3000, dmg: 31, rpm: 660, auto: true, mag: 25, reserve: 75, reload: 2.0, pellets: 1, falloff: 0.92, noise: 45, spread: [0.003, 0.7, 1.0, 0.03, 0.0035], kick: [[0.006, 0], [0.007, 0.001], [0.007, -0.001], [0.008, 0.001], [0.008, -0.001], [0.009, 0.002], [0.009, -0.002], [0.01, 0.001], [0.01, -0.001], [0.01, 0.002], [0.011, -0.002], [0.011, 0]] },
+  talon:   { name: 'TALON', cls: 'rifle', price: 2700, dmg: 34, rpm: 600, auto: true, mag: 30, reserve: 90, reload: 2.2, pellets: 1, falloff: 0.9, noise: 45, spread: [0.0035, 0.7, 1.0, 0.03, 0.004], kick: [[0.007, 0], [0.008, 0.001], [0.009, -0.001], [0.01, 0.002], [0.011, -0.002], [0.012, 0.003], [0.012, -0.003], [0.013, 0.004], [0.013, -0.004], [0.014, 0.005]] },
+  gavel:   { name: 'GAVEL', cls: 'rifle', price: 3000, dmg: 31, rpm: 660, auto: true, mag: 25, reserve: 75, reload: 2.0, pellets: 1, falloff: 0.92, noise: 45, spread: [0.003, 0.7, 1.0, 0.03, 0.0035], kick: [[0.006, 0], [0.007, 0.001], [0.007, -0.001], [0.008, 0.001], [0.008, -0.001], [0.009, 0.002], [0.009, -0.002], [0.01, 0.001]] },
   longbow: { name: 'LONGBOW', cls: 'marksman', price: 4500, dmg: 112, rpm: 40, auto: false, mag: 5, reserve: 20, reload: 2.8, pellets: 1, falloff: 0.95, noise: 50, scope: true, zoomFov: [40, 15], spread: [0.05, 0.7, 1.0, 0.06, 0.012], scopedSpread: 0.0008, kick: [[0.03, 0]] },
   cutlass: { name: 'CUTLASS', cls: 'knife', price: 0, dmg: 40, backstab: 65, rpm: 100, auto: false, mag: 0, reserve: 0, reload: 0, pellets: 1, falloff: 1, noise: 0, range: 1.9, spread: [0, 1, 0, 0, 0], kick: [[0, 0]] },
 };
@@ -87,9 +104,6 @@ export const VM = {
   cutlass: { barrel: 0, mag: 'none', stock: false, accent: 0xc8c0b0, grip: 0 },
 };
 
-// Debug only (removed in M6): ?fxhold=1 stretches muzzle-flash and tracer
-// life x20 so a slow headless capture can see them. Same code path.
-export const FXHOLD = new URLSearchParams(location.search).get('fxhold') === '1' ? 20 : 1;
 
 // --- input ---
 export const INPUT = {

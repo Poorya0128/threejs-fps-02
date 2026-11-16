@@ -4,7 +4,6 @@
 import * as THREE from 'three';
 import { buildWeapon } from './weapons-art.js';
 import { damp } from '../math.js';
-import { FXHOLD } from '../config.js';
 
 const HIP = { x: 0.24, y: -0.21, z: -0.45 };
 const ADS = { x: 0.0, y: -0.135, z: -0.32 };
@@ -25,7 +24,7 @@ export function createViewmodel(vmScene) {
   flash.add(f1, f2);
   const flashLight = new THREE.PointLight(0xffc27a, 0, 3, 1.6);
   flash.add(flashLight);
-  vmScene.add(flash); // in vm-scene space, positioned at the muzzle each shot
+  vmScene.add(flash); // vm-scene space, at the muzzle each shot
   const _mw = new THREE.Vector3();
   // Gloved hands: simple curled shapes gripping the gun.
   const glove = new THREE.MeshStandardMaterial({ color: 0x3a352c, metalness: 0, roughness: 0.85 });
@@ -54,7 +53,7 @@ export function createViewmodel(vmScene) {
       handR.position.set(0.02, -0.05, 0.02);
       handL.position.set(0.0, -0.06, -0.28);
     },
-    flash() { s.flashT = 0.06 * FXHOLD; },
+    flash() { s.flashT = 0.06; },
     muzzleObj() { return cur ? cur.muzzle : null; },
     update(state, dt) {
       const p = state.player;
@@ -100,8 +99,8 @@ export function createViewmodel(vmScene) {
         m.getWorldPosition(_mw);
         flash.position.copy(_mw);
         flash.rotation.z = Math.random() * Math.PI;
-        flashMat.opacity = Math.max(0, s.flashT / (0.06 * FXHOLD));
-        flashLight.intensity = 14 * Math.max(0, s.flashT / (0.06 * FXHOLD));
+        flashMat.opacity = Math.max(0, s.flashT / (0.06));
+        flashLight.intensity = 14 * Math.max(0, s.flashT / (0.06));
         flash.visible = true;
       } else flash.visible = false;
     },

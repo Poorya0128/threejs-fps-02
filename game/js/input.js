@@ -21,15 +21,14 @@ export function createInput(canvas, input) {
     if (k) { input[k] = down; if (k === 'jump' || k === 'crouch') e.preventDefault(); }
     if (e.code === 'KeyR' && down) input.reload = true;
     if (e.code === 'KeyQ' && down) input.lastWeapon = true;
+    if (e.code === 'KeyE') input.interact = down;
+    if (e.code === 'Tab') { input.scoreboard = down; e.preventDefault(); }
     if (e.code.startsWith('Digit')) { const s = Number(e.code[5]); if (down && s >= 1 && s <= 4) input.slot = s; }
   };
   const onMouseMove = (e) => {
     if (!input.locked) return;
     if (justLocked) { justLocked = false; return; }
-    // Chromium fires synthetic mousemove events on pointer-lock acquisition
-    // and on mousedown while locked, with movement equal to minus the
-    // pre-lock cursor position (hundreds of px in one event). A real mouse
-    // never moves that far in a single event; drop those.
+    // A real mouse never moves that far in a single event; drop those.
     if (Math.abs(e.movementX) > 250 || Math.abs(e.movementY) > 250) return;
     input.lookDX += clamp(e.movementX, -150, 150);
     input.lookDY += clamp(e.movementY, -150, 150);

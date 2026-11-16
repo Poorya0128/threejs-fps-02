@@ -1,6 +1,6 @@
-// SALTLINE art/post.js — HDR pipeline (ART.md §2). The renderer itself does
-// no tone mapping: world -> HDR target (HalfFloat, MSAA) -> bloom -> one
-// final fullscreen pass (exposure, ACES, grade, vignette, grain) -> screen.
+// SALTLINE art/post.js — HDR pipeline (ART.md §2): world -> HDR target
+// (HalfFloat, MSAA) -> bloom -> final pass (exposure, ACES, grade,
+// vignette, grain) -> screen. The renderer itself does no tone mapping.
 import * as THREE from 'three';
 import { RENDER } from '../config.js';
 

@@ -4,7 +4,7 @@
 // height). A* uses preallocated buffers — no allocations per search.
 import { rayAABB } from './math.js';
 
-const MAX_LINK_DIST = 14;
+const MAX_LINK_DIST = 20;
 
 // Test whether a straight walk from (x0,z0) to (x1,z1) at ground y is clear:
 // sample the segment and check a capsule (radius 0.4) against every box.

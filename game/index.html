@@ -1,102 +1,97 @@
 <!doctype html>
 <!--
-Reviewer's map (M2: gunplay — the game itself lands in M1–M7):
-- three.js 0.187.0 via the single import map below — game/three.module.min.js
-- Fixed-step loop at 64 Hz with render interpolation — js/main.js tickOnce()
-- Player movement: friction, accel, jump, crouch, capsule vs AABB collision — js/physics.js stepAgent()
-- Brinehold blockout from box data (110x80 m, Pans/Boiler sites) — js/map.js MAP
-- Waypoint graph with auto-linking and A* — js/nav.js buildNav()
+Reviewer's map (M3: complete game loop):
+- three.js 0.187.0, single import map below — game/three.module.min.js
+- 64 Hz fixed-step loop, render interpolation — js/main.js tickOnce()
+- Movement: friction, accel, jump, crouch, capsule vs AABB — js/physics.js stepAgent()
+- Brinehold blockout (110x80 m, Pans/Boiler sites) — js/map.js MAP
+- Waypoint graph, auto-linking, A* — js/nav.js buildNav()
 - HDR target, bloom, ACES final pass — js/art/post.js createPost()
-- Sun with fitted shadow map, hemisphere fill, PMREM environment — js/art/lighting.js buildLighting()
-- Bevelled boxes with world-space UVs and baked AO — js/art/geo.js bevelBox()
-- Gunplay: hitscan vs world and hitboxes, spread, spray, recoil, reload — js/weapons.js tryFire()
-- Weapon data table (7 guns + knife + grenades) — js/config.js WEAPONS
-- Viewmodel with sway, bob, kick, reload, ADS — js/art/viewmodel.js createViewmodel()
-- Weapon meshes composed from data — js/art/weapons-art.js buildWeapon()
-- Tracers, muzzle flash, decals, sparks, shells, dummy targets — js/art/fx.js createFx()
+- Sun + fitted shadow map, hemisphere, PMREM env — js/art/lighting.js buildLighting()
+- Bevelled boxes, world-space UVs, baked AO — js/art/geo.js bevelBox()
+- Gunplay: hitscan vs world/hitboxes, spread, spray, recoil, reload — js/weapons.js tryFire()
+- Weapon table (7 guns + knife + grenades) — js/config.js WEAPONS
+- Viewmodel: sway, bob, kick, reload, ADS — js/art/viewmodel.js createViewmodel()
+- Weapon meshes from data — js/art/weapons-art.js buildWeapon()
+- Tracers, muzzle flash, decals, sparks, shells — js/art/fx.js createFx()
 - WebAudio synth shots, reload, headshot ding — js/audio.js createAudio()
 - HUD: health/ammo, crosshair from spread, hit marker, killfeed — js/hud.js createHud()
+- Bots: nav routes, holds, line of sight, reaction, aim, burst fire — js/bots.js botTick()
+- Round phases buy/live/planted/post/matchEnd, economy, win reasons — js/rounds.js updateRounds()
+- Team character rigs, walk/crouch/aim/death poses — js/art/characters.js createCharacters()
+- Deterministic screenshot setups (cover/buy/fuse/roundend) — js/scenarios.js applyScenario()
+- Title screen + pause menu (sensitivity, FOV, volume, difficulty) — js/main.js deploy()
 -->
 <html lang="en">
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>SALTLINE — Brinehold (M2)</title>
+<title>SALTLINE — Brinehold (M3)</title>
 <style>
-  :root {
-    --ink: #e8e2d6; --muted: #9a938a; --accent: #f0a03c; --teal: #2f8f86;
-    --panel: rgba(20, 22, 28, 0.72);
-  }
-  * { box-sizing: border-box; }
-  html, body {
-    margin: 0; height: 100%; overflow: hidden; background: #2b2140; color: var(--ink);
-    font-family: ui-monospace, Consolas, monospace;
-  }
-  #game, #game canvas { position: fixed; inset: 0; display: block; }
-  #hud { position: fixed; inset: 0; pointer-events: none; font-variant-numeric: tabular-nums; }
-  .panel {
-    position: absolute; background: var(--panel); padding: 6px 10px;
-    clip-path: polygon(0 0, calc(100% - 10px) 0, 100% 10px, 100% 100%, 10px 100%, 0 calc(100% - 10px));
-  }
-  #hud-topleft { left: 14px; top: 12px; font-size: 13px; line-height: 1.5; }
-  #hud-topleft b { color: var(--accent); }
-  #hud-topleft .score { font-size: 18px; letter-spacing: 0.08em; }
-  #hud-bottomleft { left: 14px; bottom: 14px; min-width: 170px; }
-  #hud-bottomleft .hp { font-size: 26px; line-height: 1; }
-  #hud-bottomleft .bar { height: 5px; background: #3a3f46; margin-top: 5px; }
-  #hud-bottomleft .bar i { display: block; height: 100%; background: var(--accent); width: 100%; }
-  #hud-bottomright { right: 14px; bottom: 14px; text-align: right; font-size: 13px; line-height: 1.5; }
-  #hud-bottomright .ammo { font-size: 22px; }
-  #hud-hint {
-    position: absolute; left: 50%; top: 58%; transform: translateX(-50%);
-    font-size: 14px; letter-spacing: 0.14em; color: var(--ink);
-    text-shadow: 0 1px 4px #000;
-  }
-  #hud-cross {
-    position: absolute; left: 50%; top: 50%; width: 0; height: 0; --gap: 6px;
-  }
-  #hud-cross::before, #hud-cross::after,
-  #hud-cross i, #hud-cross b {
-    content: ""; position: absolute; background: var(--ink);
-    box-shadow: 0 0 2px #000;
-  }
-  #hud-cross::before { left: calc(-1px - var(--gap) - 5px); top: -1px; width: 5px; height: 2px; }
-  #hud-cross::after { left: calc(1px + var(--gap)); top: -1px; width: 5px; height: 2px; }
-  #hud-cross i { left: -1px; top: calc(-1px - var(--gap) - 5px); width: 2px; height: 5px; }
-  #hud-cross b { left: -1px; top: calc(1px + var(--gap)); width: 2px; height: 5px; }
-  #hud-hitmark {
-    position: absolute; left: 50%; top: 50%; width: 18px; height: 18px;
-    transform: translate(-50%, -50%) rotate(45deg); display: none;
-    border: 2px solid #e8e2d6; box-shadow: 0 0 3px #000;
-  }
-  #hud-killfeed {
-    position: absolute; right: 14px; top: 12px; text-align: right;
-    font-size: 12px; line-height: 1.6; color: var(--ink);
-    text-shadow: 0 1px 3px #000;
-  }
-  #hud-scope {
-    position: absolute; inset: 0; display: none; pointer-events: none;
-    background: radial-gradient(circle at 50% 50%, transparent 26%, rgba(0,0,0,0.96) 27%);
-  }
-  #hud-scope::before, #hud-scope::after {
-    content: ""; position: absolute; background: rgba(232,226,214,0.85);
-  }
-  #hud-scope::before { left: 50%; top: 12%; width: 1px; height: 76%; transform: translateX(-0.5px); }
-  #hud-scope::after { left: 12%; top: 50%; width: 76%; height: 1px; transform: translateY(-0.5px); }
+:root { --ink: #e8e2d6; --muted: #9a938a; --accent: #f0a03c; --teal: #2f8f86; --panel: rgba(20, 22, 28, 0.72); }
+ * { box-sizing: border-box; }
+html, body { margin: 0; height: 100%; overflow: hidden; background: #2b2140; color: var(--ink); font-family: ui-monospace, Consolas, monospace; }
+ #game, #game canvas { position: fixed; inset: 0; display: block; } #hud { position: fixed; inset: 0; pointer-events: none; font-variant-numeric: tabular-nums; }
+.panel { position: absolute; background: var(--panel); padding: 6px 10px; clip-path: polygon(0 0, calc(100% - 10px) 0, 100% 10px, 100% 100%, 10px 100%, 0 calc(100% - 10px)); }
+ #hud-topleft { left: 14px; top: 12px; font-size: 13px; line-height: 1.5; } #hud-topleft b { color: var(--accent); } #hud-topleft .score { font-size: 18px; letter-spacing: 0.08em; } #hud-bottomleft { left: 14px; bottom: 14px; min-width: 170px; } #hud-bottomleft .hp { font-size: 26px; line-height: 1; } #hud-bottomleft .bar { height: 5px; background: #3a3f46; margin-top: 5px; } #hud-bottomleft .bar i { display: block; height: 100%; background: var(--accent); width: 100%; } #hud-bottomright { right: 14px; bottom: 14px; text-align: right; font-size: 13px; line-height: 1.5; } #hud-bottomright .ammo { font-size: 22px; }
+#hud-hint { position: absolute; left: 50%; top: 58%; transform: translateX(-50%); font-size: 14px; letter-spacing: 0.14em; color: var(--ink); text-shadow: 0 1px 4px #000; }
+#hud-cross { position: absolute; left: 50%; top: 50%; width: 0; height: 0; --gap: 6px; }
+ #hud-cross::before, #hud-cross::after,
+#hud-cross i, #hud-cross b { content: ""; position: absolute; background: var(--ink); box-shadow: 0 0 2px #000; }
+ #hud-cross::before { left: calc(-1px - var(--gap) - 5px); top: -1px; width: 5px; height: 2px; } #hud-cross::after { left: calc(1px + var(--gap)); top: -1px; width: 5px; height: 2px; } #hud-cross i { left: -1px; top: calc(-1px - var(--gap) - 5px); width: 2px; height: 5px; } #hud-cross b { left: -1px; top: calc(1px + var(--gap)); width: 2px; height: 5px; }
+#hud-hitmark { position: absolute; left: 50%; top: 50%; width: 18px; height: 18px; transform: translate(-50%, -50%) rotate(45deg); display: none; border: 2px solid #e8e2d6; box-shadow: 0 0 3px #000; }
+#hud-killfeed { position: absolute; right: 14px; top: 12px; text-align: right; font-size: 12px; line-height: 1.6; color: var(--ink); text-shadow: 0 1px 3px #000; }
+#hud-scope { position: absolute; inset: 0; display: none; pointer-events: none; background: radial-gradient(circle at 50% 50%, transparent 26%, rgba(0,0,0,0.96) 27%); }
+#hud-scope::before, #hud-scope::after { content: ""; position: absolute; background: rgba(232,226,214,0.85); }
+ #hud-scope::before { left: 50%; top: 12%; width: 1px; height: 76%; transform: translateX(-0.5px); } #hud-scope::after { left: 12%; top: 50%; width: 76%; height: 1px; transform: translateY(-0.5px); }
+#hud-banner { position: absolute; left: 50%; top: 22%; transform: translateX(-50%); font-size: 26px; letter-spacing: 0.2em; color: var(--accent); text-shadow: 0 2px 8px #000; white-space: nowrap; }
+#hud-progress { position: absolute; left: 50%; top: 62%; transform: translateX(-50%); width: 260px; text-align: center; font-size: 12px; letter-spacing: 0.12em; text-shadow: 0 1px 3px #000; }
+ #hud-progress .bar { height: 6px; background: #3a3f46; margin-top: 4px; } #hud-progress .bar i { display: block; height: 100%; background: var(--accent); width: 0; }
+#hud-scoreboard { position: absolute; left: 50%; top: 50%; transform: translate(-50%, -50%); width: 460px; background: var(--panel); padding: 14px 18px; font-size: 13px; line-height: 1.9; }
+ #hud-scoreboard h3 { margin: 0 0 6px; font-size: 15px; letter-spacing: 0.14em; color: var(--accent); } #hud-scoreboard div { display: flex; justify-content: space-between; } #hud-scoreboard .dead { color: var(--muted); }
+#hud-spectate { position: absolute; left: 50%; bottom: 76px; transform: translateX(-50%); font-size: 13px; letter-spacing: 0.12em; color: var(--teal); text-shadow: 0 1px 3px #000; }
+.overlay { position: fixed; inset: 0; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 14px; background: rgba(12, 10, 18, 0.78); z-index: 10; text-align: center; }
+ .overlay h1 { margin: 0; font-size: 44px; letter-spacing: 0.3em; color: var(--accent); } .overlay h2 { margin: 0; font-size: 15px; letter-spacing: 0.18em; color: var(--muted); font-weight: normal; }
+.overlay button { font: inherit; font-size: 16px; letter-spacing: 0.14em; cursor: pointer; color: #14161c; background: var(--accent); border: 0; padding: 12px 34px; }
+ .overlay button.ghost { background: transparent; color: var(--ink); border: 1px solid var(--muted); } .overlay .keys { font-size: 12px; line-height: 1.9; color: var(--muted); } .overlay label { font-size: 13px; color: var(--ink); } .overlay label input, .overlay label select { margin-left: 8px; accent-color: var(--accent); } .overlay .row { display: flex; gap: 22px; align-items: center; }
 </style>
 <script type="importmap">{ "imports": { "three": "./three.module.min.js" } }</script>
 </head>
 <body>
 <div id="game"></div>
 <div id="hud">
-  <div class="panel" id="hud-topleft"><span id="hud-round">ROUND 1</span><br><span class="score"><b>STRAND</b> <span id="hud-score">0 — 0</span> <b style="color:var(--teal)">BASTION</b></span><br><span id="hud-timer">1:45</span></div>
+  <div class="panel" id="hud-topleft"><span id="hud-round">ROUND 1</span><br><span class="score"><b>STRAND</b> <span id="hud-score">0 — 0</span> <b style="color:var(--teal)">BASTION</b></span><br><span id="hud-timer">1:45</span><br><span id="hud-pips" style="color:var(--muted)">●●●●●  ●●●●●</span></div>
   <div id="hud-killfeed"></div>
-  <div class="panel" id="hud-bottomleft"><span class="hp" id="hud-hp">100</span> <span style="color:var(--muted)">HP</span> <span id="hud-armor" style="color:var(--teal); font-size:12px"></span><div class="bar"><i id="hud-hpbar"></i></div></div>
+  <div class="panel" id="hud-bottomleft"><span class="hp" id="hud-hp">100</span> <span style="color:var(--muted)">HP</span> <span id="hud-armor" style="color:var(--teal); font-size:12px"></span><div class="bar"><i id="hud-hpbar"></i></div><span id="hud-money" style="color:var(--accent)">$900</span></div>
   <div class="panel" id="hud-bottomright"><span class="ammo" id="hud-ammo">30 / 90</span><br><span id="hud-weapon" style="color:var(--muted)">TALON</span></div>
   <div id="hud-cross"><i></i><b></b></div>
   <div id="hud-hitmark"></div>
   <div id="hud-scope"></div>
   <div id="hud-hint">CLICK TO DEPLOY</div>
+  <div id="hud-banner" style="display:none"></div>
+  <div id="hud-progress" style="display:none"><span id="hud-proglabel">PLANTING THE FUSE — HOLD E</span><div class="bar"><i id="hud-progbar"></i></div></div>
+  <div id="hud-scoreboard" style="display:none"></div>
+  <div id="hud-spectate"></div>
+</div>
+<div class="overlay" id="title" style="display:none">
+  <h1>SALTLINE</h1>
+  <h2>BRINEHOLD — 5v5 TACTICAL FPS · FIRST TO 7 ROUNDS</h2>
+  <div class="row">
+    <label><input type="radio" name="diff" value="recruit"> RECRUIT</label>
+    <label><input type="radio" name="diff" value="regular" checked> REGULAR</label>
+    <label><input type="radio" name="diff" value="veteran"> VETERAN</label>
+  </div>
+  <button id="deploy">DEPLOY</button>
+  <div class="keys">WASD MOVE · MOUSE AIM · CLICK FIRE · R RELOAD · E PLANT / DEFUSE<br>Q LAST WEAPON · 1–4 WEAPONS · SHIFT WALK · CTRL CROUCH · SPACE JUMP<br>TAB SCOREBOARD · ESC PAUSE · PLANT THE FUSE AT PANS OR BOILER</div>
+</div>
+<div class="overlay" id="pause" style="display:none">
+  <h1>PAUSED</h1>
+  <div class="row"><label>SENSITIVITY <input type="range" id="set-sens" min="0.0005" max="0.005" step="0.0001" value="0.0023"></label></div>
+  <div class="row"><label>FOV <input type="range" id="set-fov" min="60" max="110" step="1" value="78"></label></div>
+  <div class="row"><label>VOLUME <input type="range" id="set-vol" min="0" max="1" step="0.05" value="0.5"></label></div>
+  <div class="row"><label>DIFFICULTY <select id="set-diff"><option value="recruit">RECRUIT</option><option value="regular" selected>REGULAR</option><option value="veteran">VETERAN</option></select></label></div>
+  <button id="resume">RESUME</button>
+  <button class="ghost" id="restart">RESTART MATCH</button>
 </div>
 <script type="module" src="./js/main.js"></script>
 </body>

@@ -21,7 +21,7 @@ function cyl(r0, r1, len, mat, x, y, z, parent, axis = 'z') {
   m.position.set(x, y, z); parent.add(m); return m;
 }
 
-// Extruded 2D profile (side view, x = length, y = height) with a small bevel.
+// Extruded 2D side profile (x = length, y = height), small bevel.
 function extrude(pts, depth, mat, x, y, z, parent) {
   const s = new THREE.Shape();
   s.moveTo(pts[0][0], pts[0][1]);

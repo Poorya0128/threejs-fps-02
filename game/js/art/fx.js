@@ -1,8 +1,7 @@
-// SALTLINE art/fx.js — pooled effects (ART.md §10) + static dummy targets
-// for M2. Drains state.fxEvents (written by weapons.js) into visual pools.
-// No allocations per frame: fixed pools, ring indices, scratch vectors.
+// SALTLINE art/fx.js — pooled effects (ART.md §10). Drains state.fxEvents
+// (written by weapons.js) into visual pools. No allocations per frame:
+// fixed pools, ring indices, scratch vectors.
 import * as THREE from 'three';
-import { FXHOLD } from '../config.js';
 
 const _a = new THREE.Vector3(), _b = new THREE.Vector3(), _c = new THREE.Vector3();
 
@@ -47,30 +46,6 @@ export function createFx(scene) {
   const flashLight = new THREE.PointLight(0xffc27a, 0, 16, 1.8);
   scene.add(flashLight);
   let flashT = 0;
-  // --- dummy targets: capsule body + head, team colours ---
-  const dummies = new Map();
-  const bodyGeo = new THREE.CylinderGeometry(0.22, 0.26, 1.05, 10);
-  const headGeo = new THREE.SphereGeometry(0.14, 12, 10);
-  const legGeo = new THREE.CylinderGeometry(0.09, 0.1, 0.75, 8);
-  function dummyMesh(a) {
-    const g = new THREE.Group();
-    const col = a.team === 'bastion' ? 0x2f6f68 : 0x8a6a2c;
-    const bodyMat = new THREE.MeshStandardMaterial({ color: col, roughness: 0.8, metalness: 0.1 });
-    const body = new THREE.Mesh(bodyGeo, bodyMat);
-    body.position.y = 1.05; body.castShadow = true; g.add(body);
-    const head = new THREE.Mesh(headGeo, new THREE.MeshStandardMaterial({ color: 0xc8a882, roughness: 0.7 }));
-    head.position.y = 1.72; head.castShadow = true; g.add(head);
-    const visor = new THREE.Mesh(new THREE.BoxGeometry(0.2, 0.05, 0.05), new THREE.MeshStandardMaterial({ color: 0x1d1d1f, roughness: 0.3, metalness: 0.6 }));
-    visor.position.set(0, 1.74, -0.12); g.add(visor);
-    for (const s of [-1, 1]) {
-      const leg = new THREE.Mesh(legGeo, new THREE.MeshStandardMaterial({ color: 0x2e2d2b, roughness: 0.9 }));
-      leg.position.set(0.12 * s, 0.38, 0); g.add(leg);
-    }
-    g.userData = { bodyMat, flashT: 0, fall: 0 };
-    scene.add(g);
-    return g;
-  }
-
   function spawnTracer(x, y, z, ex, ey, ez) {
     const tr = tracers[trIdx]; trIdx = (trIdx + 1) % tracers.length;
     _a.set(x, y, z); _b.set(ex, ey, ez);
@@ -78,7 +53,7 @@ export function createFx(scene) {
     tr.m.position.copy(_a).lerp(_b, 0.5);
     tr.m.lookAt(_b);
     tr.m.scale.set(1, 1, len);
-    tr.m.material.opacity = 0.9; tr.m.visible = true; tr.t = 0.12 * FXHOLD;
+    tr.m.material.opacity = 0.9; tr.m.visible = true; tr.t = 0.12;
   }
   function spawnDecal(x, y, z, nx, ny, nz) {
     const m = decals[decIdx]; decIdx = (decIdx + 1) % decals.length;
@@ -106,27 +81,24 @@ export function createFx(scene) {
 
   return {
     // Drain the ring buffer and step all pools.
-    update(state, viewmodel, dt) {
+    update(state, viewmodel, dt, chars) {
       const ev = state.fxEvents;
       while (state.fxHead !== state.fxTail) {
         const e = ev[state.fxHead];
         state.fxHead = (state.fxHead + 1) % 32;
         if (e.kind === 0) spawnTracer(e.x, e.y, e.z, e.dx, e.dy, e.dz);
-        else if (e.kind === 1) { viewmodel.flash(); flashLight.position.set(e.x, e.y, e.z); flashLight.intensity = 22; flashT = 0.06 * FXHOLD; }
+        else if (e.kind === 1) { viewmodel.flash(); flashLight.position.set(e.x, e.y, e.z); flashLight.intensity = 22; flashT = 0.06; }
         else if (e.kind === 2) spawnDecal(e.x, e.y, e.z, e.dx, e.dy, e.dz);
         else if (e.kind === 3) spawnSparks(e.x, e.y, e.z);
         else if (e.kind === 4) spawnShell(e.x, e.y, e.z, e.dx, e.dz);
-        else if (e.kind === 6) {
-          const d = dummies.get(e.mat);
-          if (d) { d.userData.flashT = 0.12; }
-        }
+        else if (e.kind === 6 && chars) chars.flash(e.mat);
       }
-      if (flashT > 0) { flashT -= dt; flashLight.intensity = 22 * Math.max(0, flashT / (0.06 * FXHOLD)); }
+      if (flashT > 0) { flashT -= dt; flashLight.intensity = 22 * Math.max(0, flashT / (0.06)); }
       else flashLight.intensity = 0;
       for (const tr of tracers) {
         if (tr.t <= 0) continue;
         tr.t -= dt;
-        tr.m.material.opacity = Math.max(0, tr.t / (0.12 * FXHOLD)) * 0.9;
+        tr.m.material.opacity = Math.max(0, tr.t / (0.12)) * 0.9;
         if (tr.t <= 0) tr.m.visible = false;
       }
       for (let i = 0; i < SN; i++) {
@@ -146,24 +118,6 @@ export function createFx(scene) {
         s.m.rotation.x += 9 * dt; s.m.rotation.z += 7 * dt;
         if (s.m.position.y < 0.01) { s.m.position.y = 0.01; s.vy *= -0.35; s.vx *= 0.6; s.vz *= 0.6; }
         if (s.t <= 0) s.m.visible = false;
-      }
-      // Dummy targets: place, hit-flash, fall on death.
-      for (const a of state.agents) {
-        if (!a.isBot) continue;
-        let d = dummies.get(a.id);
-        if (!d) { d = dummyMesh(a); dummies.set(a.id, d); }
-        d.position.set(a.pos.x, a.pos.y, a.pos.z);
-        d.rotation.y = a.yaw;
-        if (!a.alive && d.userData.fall < 1) {
-          d.userData.fall = Math.min(1, d.userData.fall + dt * 3);
-          d.rotation.x = -Math.PI / 2 * d.userData.fall;
-          d.position.y = 0.25 * d.userData.fall;
-        }
-        if (d.userData.flashT > 0) {
-          d.userData.flashT -= dt;
-          d.userData.bodyMat.emissive.setHex(0xffffff);
-          d.userData.bodyMat.emissiveIntensity = Math.max(0, d.userData.flashT / 0.12) * 0.8;
-        } else d.userData.bodyMat.emissiveIntensity = 0;
       }
     },
   };
