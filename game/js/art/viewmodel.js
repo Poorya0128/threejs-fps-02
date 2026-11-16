@@ -15,44 +15,64 @@ function limb(B, a, b, r0, r1, col, e) {
 	_q.setFromUnitVectors(_up, _v.normalize());
 	B.add(new CylinderGeometry(r1, r0, len, 14,3), _m.compose(_c.addVectors(a, b).multiplyScalar(.5), _q, _s.set(1,1,1)), e, col);
 }
-// Capsule bone between two points; a finger is three of them following an elliptical arc around the part it grips.
+// Capsule bone between two points (smooth leather: aE 1); a finger is three of them (tapering phalanges, the last one tinted) that follow a
+// superellipse around the part it grips, so the pads sit on the grip's flats and corners without cutting into them.
 function seg(B, a, b, r, col) {
 	_v.subVectors(b, a); const len = _v.length(); _q.setFromUnitVectors(_up, _v.normalize());
-	B.add(new CapsuleGeometry(r, len, 2,8), _m.compose(_c.addVectors(a, b).multiplyScalar(.5), _q, _s.set(1,1,1)), 0, col);
+	B.add(new CapsuleGeometry(r, len, 3, 10), _m.compose(_c.addVectors(a, b).multiplyScalar(.5), _q, _s.set(1, 1, 1)), 1, col);
 }
 const P = (x, y, z) => new Vector3(x, y, z);
-// Ellipsoid pad (back of the hand, heel of the palm), tilted by rx about x.
-const pad = (B, x, y, z, sx, sy, sz, rx, col) => B.add(new SphereGeometry(1,14,10), _m.compose(_v.set(x, y, z), _q.setFromAxisAngle(_ax, rx), _s.set(sx, sy, sz)), 0, col);
-function finger(B, pts, r, col, tip) { for (let k = 0; k < 3; k++) seg(B, pts[k], pts[k + 1], r * (1 - k * .08), k === 2 ? tip : col); }
-// C-shaped fingers: around the pistol grip in the horizontal plane (x/z), around the handguard in the cross-section (x/y).
-const gripArc = (y, deg) => { const t = (-.02 - y) / .1, zc = .0175 + .0235 * t; return deg.map((d) => P(.024 * Math.cos(d / 57.3), y, zc + .028 * Math.sin(d / 57.3))); };
-const hgArc = (z, [cy, rx, ry], deg) => deg.map((d) => P((rx + .009) * Math.cos(d / 57.3), cy + (ry + .009) * Math.sin(d / 57.3), z));
-// Right hand: palm behind the grip, three fingers wrapped round it, index finger on the trigger, thumb over the left side.
-// Left hand: palm under the handguard, four fingers up its right side, thumb along the left (long guns), or cupping
-// the right hand (pistols). Gloves are light coyote against the dark gun; sleeves are muted team cloth.
-function buildArms(team, w, knife) {
-	const R = new Bld(), L = new Bld(), glove = lin(0xa48a62), tip = lin(0x7c6646), sleeve = lin(new Color(TEAM_LOOK[team].cloth).lerp(new Color(0x3c3d3e), .5).getHex());
-	seg(R, P(.006,-.04,.05), P(.008,-.094,.064), .017, glove);
-	pad(R, .02,-.064,.036,.013,.036,.03,-.23, glove);
-	for (const y of [-.052,-.072,-.092]) finger(R, gripArc(y, [25,-40,-105,-165]), .0092, glove, tip);
-	finger(R, [P(.024,-.03,.012), P(.019,-.033,-.006), P(.009,-.036,-.016), P(.002,-.04,-.017)], .0088, glove, tip);
-	finger(R, [P(.004,-.026,.05), P(-.014,-.026,.032), P(-.022,-.026,.012), P(-.022,-.028,-.004)], .0098, glove, tip);
-	seg(R, P(.016,-.05,.05), P(.026,-.072,.095), .025, glove);
-	limb(R, _a.set(.026,-.07,.085), _b.set(.1,-.2,.42), .034,.04, sleeve, 0);
+const pad = (B, x, y, z, sx, sy, sz, rx, col) => B.add(new SphereGeometry(1, 14, 10), _m.compose(_v.set(x, y, z), _q.setFromAxisAngle(_ax, rx), _s.set(sx, sy, sz)), 1, col);
+const R_F = .0084; // finger radius: 17 mm fingers, 21 mm apart, so a 4 mm gap shows between them
+function finger(B, pts, col, tip, knuckle) {
+	for (let k = 0; k < 3; k++) seg(B, pts[k], pts[k + 1], R_F * (1 - k * .1), k === 2 ? tip : col);
+	if (knuckle) B.add(new SphereGeometry(R_F * 1.12, 10, 8), _m.compose(pts[0], _q.identity(), _s.set(1, 1, 1)), 1, knuckle);
+}
+const se = (d, a, b, p) => { const c = Math.cos(d / 57.3), s = Math.sin(d / 57.3); return [a * Math.sign(c) * Math.abs(c) ** p, b * Math.sign(s) * Math.abs(s) ** p]; };
+const at = (L, y) => L[0] + (L[2] - L[0]) * (y - L[1]) / (L[3] - L[1]);
+// Hands on a weapon (gun-local coordinates, from weapons-art grip data). Right hand: heel of the palm behind the grip,
+// back of the hand on its right flat, three fingers wrapped round the front at the grip's rake, index finger through
+// the guard onto the trigger, thumb along the left side of the receiver. Left hand: palm under the handguard, four
+// fingers round its right side, thumb along its left side; on pistols it wraps the right hand instead.
+// Returns the meshes' builders and the wrist points the arms (viewmodel sleeves, soldier IK) attach to.
+export function buildHands(w, knife, glove, tip, knuckle) {
+	const R = new Bld(), L = new Bld(), G = w.grip, zf = (y) => at(G.f, y), zb = (y) => at(G.b, y);
+	const rake = -Math.atan2(zb(G.top - .1) - zb(G.top), .1), ym = G.fy - .02, hw = G.hw;
+	const wrap = (y, out, deg) => { const zc = (zf(y) + zb(y)) / 2, hd = (zb(y) - zf(y)) / 2; return deg.map((d, j) => { const [x, z] = se(d, hw + R_F + out, hd + R_F + out, .6); return P(x, y - j * .002, zc + z); }); };
+	seg(R, P(.002, G.top - .012, zb(G.top - .012) + .012), P(.003, G.fy - .05, zb(G.fy - .05) + .012), .016, glove);
+	pad(R, hw + .006, ym + .004, zb(ym) - .012, .009, .036, .021, rake, glove);
+	pad(R, hw * .3, G.top - .004, zb(G.top) + .006, .018, .011, .016, 0, glove);
+	for (let k = 0; k < 3; k++) finger(R, wrap(G.fy - k * .021, .001, [42, -30, -105, -168]), glove, tip, knuckle);
+	const [ty, tz] = G.trig;
+	finger(R, [P(hw + .007, ty + .003, zb(G.top) - .004), P(hw + .007, ty, tz + .026), P(hw * .5 + .005, ty - .003, tz + .009), P(.002, ty - .005, tz - .007)], glove, tip, knuckle);
+	const yT = G.top + .01;
+	const xT = -G.side - R_F * 1.1;
+	finger(R, [P(hw * .2, G.top - .004, zb(G.top) + .012), P(xT + .002, yT, zb(G.top) - .002), P(xT, yT + .002, zf(G.top) - .008), P(xT + .001, yT + .003, zf(G.top) - .032)], glove, tip);
+	const rw = [hw * .4, ym - .01, zb(ym) + .036];
+	seg(R, P(.004, ym, zb(ym) + .014), P(...rw), .021, glove);
+	let lw = null;
 	if (!knife && w.left) {
-		const z = w.left[2], hg = w.hg, [cy, rx, ry] = hg;
-		seg(L, P(-rx * .75 - .01, cy - ry * .75 - .01, z + .045), P(-rx * .5 - .004, cy - ry - .006, z - .035), .02, glove);
-		for (let k = 0; k < 4; k++) finger(L, hgArc(z - .036 + k * .021, hg, [-125,-60,0,55]), .0092, glove, tip);
-		finger(L, [P(-rx - .016, cy - ry * .5, z + .03), P(-rx - .012, cy, z + .005), P(-rx - .008, cy + ry * .45, z - .02), P(-rx - .004, cy + ry * .7, z - .04)], .0098, glove, tip);
-		const wx = -rx - .012, wy = cy - ry - .004, wz = z + .055;
-		seg(L, P(wx + .004, wy + .004, wz - .01), P(wx - .018, wy - .026, wz + .03), .026, glove);
-		limb(L, _a.set(wx - .012, wy - .018, wz + .02), _b.set(wx - .17, wy - .22, wz + .18), .034,.046, sleeve, 0);
+		const z = w.left[2], [cy, rx, ry, p] = w.hg, ring = (zz, deg) => deg.map((d) => { const [x, y] = se(d, rx + R_F + .001, ry + R_F + .001, p); return P(x, cy + y, zz); });
+		const [px, py] = se(-135, rx + .013, ry + .013, p);
+		seg(L, P(px, cy + py, z + .042), P(px + .006, cy + py, z - .03), .017, glove);
+		for (let k = 0; k < 4; k++) finger(L, ring(z - .032 + k * .021, [-150, -85, -15, 45]), glove, tip, knuckle);
+		finger(L, [P(-rx - .012, cy - ry * .45, z + .045), P(-rx - .01, cy - ry * .2, z + .018), P(-rx - .009, cy, z - .01), P(-rx - .008, cy + ry * .12, z - .036)], glove, tip);
+		lw = [-rx - .008, cy - ry - .004, z + .062]; seg(L, P(px, cy + py, z + .04), P(...lw), .021, glove);
 	} else if (!knife) {
-		const [x, y, z] = [-.03,-.075,.015];
-		seg(L, P(x - .03, y - .02, z + .01), P(x - .026, y - .06, z + .02), .02, glove);
-		for (let k = 0; k < 4; k++) finger(L, [P(x - .034, y - .008 - k * .019, z + .03), P(x - .02, y - .01 - k * .019, z - .005), P(x + .012, y - .012 - k * .019, z - .012), P(x + .04, y - .014 - k * .019, z - .002)], .0092, glove, tip);
-		limb(L, _a.set(x - .035, y - .03, z + .03), _b.set(x - .2, y - .24, z + .36), .034,.044, sleeve, 0);
+		const zc = (y) => (zf(y) + zb(y)) / 2;
+		pad(L, -hw - .024, ym, zc(ym) + .006, .01, .034, .026, rake, glove);
+		for (let k = 0; k < 3; k++) finger(L, wrap(G.fy - k * .021, R_F * 2, [165, 218, 255, 284]), glove, tip, knuckle);
+		finger(L, [P(-hw - .02, G.top - .02, zb(G.top) + .004), P(xT - .004, G.top - .018, zc(G.top)), P(xT - .002, G.top - .018, zf(G.top) - .008), P(xT, G.top - .018, zf(G.top) - .028)], glove, tip);
+		lw = [-hw - .024, G.fy - .05, zb(G.fy - .05) + .02]; seg(L, P(-hw - .02, ym - .02, zc(ym) + .01), P(...lw), .02, glove);
 	}
+	return { R, L, rw, lw };
+}
+// First-person arms: the hands plus a glove cuff and a muted team sleeve running back out of view.
+function buildArms(team, w, knife) {
+	const glove = lin(0xa48a62), sleeve = lin(new Color(TEAM_LOOK[team].cloth).lerp(new Color(0x3c3d3e), .5).getHex());
+	const { R, L, rw, lw } = buildHands(w, knife, glove, lin(0x8a7350), lin(0x9c8460));
+	limb(R, _a.fromArray(rw), _b.set(.1, -.2, .42), .03, .04, sleeve, 0);
+	if (lw) limb(L, _a.fromArray(lw), _b.set(lw[0] - .17, lw[1] - .22, lw[2] + .2), .03, .046, sleeve, 0);
 	const mk = (B) => { if (!B.p.length) return null; const m = new Mesh(B.geo(), weaponMaterial); m.renderOrder = 1; return m; };
 	return { right: mk(R), left: mk(L) };
 }

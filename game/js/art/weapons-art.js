@@ -46,6 +46,11 @@ function optic(B, kind, z, y) {
 	return y + .03;
 }
 
+// Where hands go: pistol grip front and back edges as [z, y, z, y] (top, bottom), half widths of grip and frame, the height under the frame
+// for the web of the hand, the first finger height and the trigger (y, z). Long guns add the handguard section
+// hg = [centre y, half width, half height, superellipse power] for the support hand.
+const PGRIP = { f: [-.016,-.03,-.005,-.12], b: [.012,-.01,.03,-.115], hw: .017, side: .014, top: -.014, fy: -.052, trig: [-.027,-.033] };
+const LGRIP = { f: [.008,-.03,.024,-.124], b: [.035,-.02,.058,-.118], hw: .016, side: .0155, top: -.026, fy: -.062, trig: [-.032,-.017] };
 function pistol(o) {
 	const B = new Bld(), K = new Bld(), A = new Bld(), L = o.len;
 	box(B, o.frame, -.014,-.012,.035,.014,.012, -L + .02,1);
@@ -59,7 +64,7 @@ function pistol(o) {
 	box(A, FIN.M, -.012,-.112,.012,.012,-.124,-.026);
 	if (o.hammer) box(K, FIN.S, -.004,.03,.058,.004,.05,.045);
 	if (o.wood) for (const s of [-1,1]) box(B, FIN.W, s * .016 - .002,-.095,.005, s * .016 + .002,-.02,-.03,1);
-	return { B, K, A, muz: [0,.028, -L - .01], left: null, sight: .05 };
+	return { B, K, A, muz: [0,.028, -L - .01], left: null, sight: .05, grip: PGRIP };
 }
 
 function longGun(o) {
@@ -97,7 +102,7 @@ function longGun(o) {
 	const sight = o.optic ? optic(B, o.optic, o.opticZ ?? -.06,.075) : .075;
 	if (!o.optic) { box(B, FIN.M, -.008,.07, z0 - .01,.008,.086, z0 - .025); box(B, FIN.M, -.002,.07, -h1 + .03,.002,.09, -h1 + .035); }
 	if (o.bolt) { box(K, FIN.S, .017,.035,-.02,.05,.042,-.028); lat(K, FIN.S, .055,.038,-.018, [.008,0,.008,.012,0,.012], 2,10); }
-	return { B, K, A, muz: [0, by, bz - o.barrel - .05], left: [0,-.005, -(h0 + .09)], hg: o.pump ? [-.01,.026,.026] : [(hy0 + .064) / 2,.023, (.066 - hy0) / 2], sight, optic: o.optic, oz: o.opticZ ?? -.06 };
+	return { B, K, A, muz: [0, by, bz - o.barrel - .05], left: [0,-.005, -(h0 + .09)], grip: LGRIP, hg: o.pump ? [-.01,.026,.026, 1] : [(hy0 + .064) / 2,.024, (.068 - hy0) / 2,.55], sight, optic: o.optic, oz: o.opticZ ?? -.06 };
 }
 
 function knife() {
@@ -141,5 +146,5 @@ export function buildWeapon(id, lod = false) {
 		if (s.optic !== 'scope') { const r = new Mesh(new PlaneGeometry(.03,.03), reticle); r.position.set(0, s.sight, (z0 + z1) / 2); r.renderOrder = 2; g.add(r); }
 	}
 	const muzzle = new Object3D(); muzzle.position.fromArray(s.muz); g.add(muzzle);
-	return { group: g, muzzle, slide, mag, left: s.left, hg: s.hg, sight: s.sight };
+	return { group: g, muzzle, slide, mag, left: s.left, hg: s.hg, grip: s.grip, sight: s.sight };
 }

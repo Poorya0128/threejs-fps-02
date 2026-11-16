@@ -4,7 +4,8 @@
 import { Bone, Skeleton, SkinnedMesh, Group, Mesh, MeshStandardMaterial, Float32BufferAttribute, Uint16BufferAttribute, CapsuleGeometry,
 	SphereGeometry, CylinderGeometry, Matrix4, Vector3, Quaternion, Euler, Color, Sprite, SpriteMaterial, CanvasTexture } from 'three';
 import { Bld, boxInto } from './mesh.js';
-import { buildWeapon } from './weapons-art.js';
+import { buildWeapon, weaponMaterial } from './weapons-art.js';
+import { buildHands } from './viewmodel.js';
 import { procMaterial } from './materials.js';
 import { TEAM_LOOK } from '../config.js';
 
@@ -14,12 +15,13 @@ const BONES = [[-1,0,0,0], [0,0,.95,0], [1,0,.27,0], [2,0,.33,0], [2,-.2,.22,0],
 const [ROOT, PELVIS, CHEST, HEAD, LUA, LFA, RUA, RFA, LTH, LSH, RTH, RSH] = BONES.keys();
 const L1 = .29, L2 = .27, DOWN = new Vector3(0,-1,0);
 const lin = (h) => { const c = new Color(h); return [c.r, c.g, c.b]; };
+const HAND = [0xa48a62, 0x8a7350, 0x9c8460].map(lin);
 const _m = new Matrix4(), _q = new Quaternion(), _q2 = new Quaternion(), _e = new Euler(), _v = new Vector3(), _s = new Vector3(1,1,1);
 const _S = new Vector3(), _T = new Vector3(), _E = new Vector3(), _D = new Vector3(), _P = new Vector3();
 
 function buildBody(team) {
 	const L = TEAM_LOOK[team], B = new Bld(), skin = [];
-	const cloth = lin(L.cloth), gear = lin(L.gear), acc = lin(L.accent), helm = lin(L.helmet), dark = lin(0x1c1c1e), face = lin(0x9a7258), glove = lin(0x9a8260);
+	const cloth = lin(L.cloth), gear = lin(L.gear), acc = lin(L.accent), helm = lin(L.helmet), dark = lin(0x1c1c1e), face = lin(0x9a7258);
 	const part = (bone, fn) => { const n0 = B.p.length / 3; fn(); for (let k = n0; k < B.p.length / 3; k++) skin.push(bone); };
 	const bx = (mn, mx, col, e = 1, r = .02) => boxInto(B, mn, mx, r, col, .4, e, e);
 	const geo = (g, x, y, z, col, e = 0, sx = 1, sy = 1, sz = 1, rx = 0) => B.add(g, _m.compose(_v.set(x, y, z), _q.setFromEuler(_e.set(rx, 0,0)), _s.set(sx, sy, sz)), e, col);
@@ -50,7 +52,7 @@ function buildBody(team) {
 	});
 	for (const [ua, fa, s] of [[LUA, LFA, -1], [RUA, RFA, 1]]) {
 		part(ua, () => { geo(new CapsuleGeometry(.052,.19,4,12), s * .2,1.31,0, cloth); bx([s * .2 - .064,1.29,-.064], [s * .2 + .064,1.41,.064], acc, 3,.04); });
-		part(fa, () => { geo(new CapsuleGeometry(.046,.17,4,12), s * .2,1.03,0, cloth); bx([s * .2 - .04,.84,-.045], [s * .2 + .04,.94,.04], glove, 1,.03); bx([s * .2 - .05,1.1,-.01], [s * .2 + .05,1.19,.06], gear, 1,.03); });
+		part(fa, () => { geo(new CapsuleGeometry(.046,.17,4,12), s * .2,1.03,0, cloth); bx([s * .2 - .05,1.1,-.01], [s * .2 + .05,1.19,.06], gear, 1,.03); });
 	}
 	for (const [th, sh, s] of [[LTH, LSH, -1], [RTH, RSH, 1]]) {
 		part(th, () => { geo(new CapsuleGeometry(.075,.28,4,14), s * .1,.69,0, cloth); if (s > 0) bx([.14,.62,-.06], [.19,.78,.06], gear); });
@@ -102,10 +104,17 @@ export function createCharacters(scene) {
 	function holdWeapon(r, id) {
 		if (r.wid === id) return;
 		if (r.gun) r.hold.remove(r.gun.group);
-		if (!weapons[id]) weapons[id] = buildWeapon(id, true);
-		r.gun = { group: weapons[id].group.clone(), left: weapons[id].left };
+		if (!weapons[id]) { // the gun with gloved hands wrapped round its grips; the arms reach the hands' wrists by IK
+			const w = buildWeapon(id, true);
+			w.rw = [0,-.065,.03]; w.lw = null;
+			const h = id === 'cutlass' ? null : buildHands(w, false, ...HAND), B = h ? h.R : new Bld();
+			if (h) { B.merge(h.L); w.rw = h.rw; w.lw = h.lw; } else B.add(new SphereGeometry(1, 12, 8), _m.compose(_v.set(0, 0, .02), _q.identity(), _s.set(.03, .045, .045)), 1, HAND[0]); // a fist on the knife
+			w.group.add(new Mesh(B.geo(), weaponMaterial));
+			weapons[id] = w;
+		}
+		r.gun = { group: weapons[id].group.clone(), rw: weapons[id].rw, lw: weapons[id].lw };
 		r.hold.add(r.gun.group); r.wid = id;
-		const pistol = !r.gun.left && id !== 'cutlass';
+		const pistol = !weapons[id].left && id !== 'cutlass';
 		r.hold.position.set(pistol ? .03 : .1, pistol ? .17 : .13, pistol ? -.42 : -.16);
 	}
 	return {
@@ -138,9 +147,9 @@ export function createCharacters(scene) {
 				if (r.fall > .3) { for (const [ua, fa, s] of [[LUA, LFA, -1], [RUA, RFA, 1]]) { b[ua].rotation.set(-.4 * f, 0, s * 1.3 * f); b[fa].rotation.set(-.5 * f, 0,0); } r.hold.visible = false; continue; }
 				r.hold.visible = true;
 				r.hold.updateMatrix();
-				for (const [ua, fa, s, pt] of [[RUA, RFA, 1, [0,-.065,.03]], [LUA, LFA, -1, r.gun.left || (r.wid === 'cutlass' ? null : [-.02,-.07,.02])]]) {
+				for (const [ua, fa, s, pt] of [[RUA, RFA, 1, r.gun.rw], [LUA, LFA, -1, r.gun.lw]]) {
 					if (!pt) { b[ua].rotation.set(.15,0,-.1); b[fa].rotation.set(-.3,0,0); continue; }
-					_T.fromArray(pt); if (s < 0 && r.gun.left) _T.z += .1; _T.applyMatrix4(r.hold.matrix); _S.copy(b[ua].position);
+					_T.fromArray(pt); _T.applyMatrix4(r.hold.matrix); _S.copy(b[ua].position);
 					reach(b[ua], b[fa], _S, _T, s);
 				}
 			}
