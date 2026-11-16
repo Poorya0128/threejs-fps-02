@@ -18,6 +18,9 @@ export function createRenderer(holder) {
   // into the same HDR target, and an auto-clear on the second render would
   // wipe the world. Clears are explicit in renderFrame().
   renderer.autoClear = false;
+  // Stats must cover the whole frame (world + viewmodel + post): don't let
+  // info auto-reset after each render() call; renderFrame() resets once.
+  renderer.info.autoReset = false;
   holder.appendChild(renderer.domElement);
 
   const scene = new THREE.Scene();
@@ -41,19 +44,26 @@ export function createRenderer(holder) {
       renderer.setSize(w, h);
       post.resize(w, h);
     },
-    // Position the eye camera from interpolated agent state.
+    // Position the eye camera from interpolated agent state. Scope zooms
+    // the FOV (Longbow: 40° / 15°); the camera shows ~50 % of the aim
+    // punch as view kick (PLAN.md §7).
     placeCamera(agent, alpha) {
       const x = agent.prevPos.x + (agent.pos.x - agent.prevPos.x) * alpha;
       const y = agent.prevPos.y + (agent.pos.y - agent.prevPos.y) * alpha;
       const z = agent.prevPos.z + (agent.pos.z - agent.prevPos.z) * alpha;
       camera.position.set(x, y + agent.eyeHeight, z);
       camera.rotation.set(0, 0, 0);
-      camera.rotateY(agent.yaw);
-      camera.rotateX(agent.pitch);
+      camera.rotateY(agent.yaw + agent.recoil.yaw * 0.5);
+      camera.rotateX(agent.pitch + agent.recoil.pitch * 0.5);
+      const w = agent.weapons.length ? agent.weapons[agent.active] : '';
+      let fov = INPUT.fov;
+      if (agent.scoped && w === 'longbow') fov = agent.scopeLevel === 2 ? 15 : 40;
+      if (camera.fov !== fov) { camera.fov = fov; camera.updateProjectionMatrix(); }
     },
     // One frame: world into HDR target, viewmodel into the same target,
     // then the post chain to the screen.
     renderFrame(time) {
+      renderer.info.reset();
       if (this.noPost) {
         renderer.setRenderTarget(null);
         renderer.clear();

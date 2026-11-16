@@ -1,6 +1,6 @@
 <!doctype html>
 <!--
-Reviewer's map (M1: move in the map — the game itself lands in M1–M7):
+Reviewer's map (M2: gunplay — the game itself lands in M1–M7):
 - three.js 0.187.0 via the single import map below — game/three.module.min.js
 - Fixed-step loop at 64 Hz with render interpolation — js/main.js tickOnce()
 - Player movement: friction, accel, jump, crouch, capsule vs AABB collision — js/physics.js stepAgent()
@@ -9,13 +9,19 @@ Reviewer's map (M1: move in the map — the game itself lands in M1–M7):
 - HDR target, bloom, ACES final pass — js/art/post.js createPost()
 - Sun with fitted shadow map, hemisphere fill, PMREM environment — js/art/lighting.js buildLighting()
 - Bevelled boxes with world-space UVs and baked AO — js/art/geo.js bevelBox()
-- HUD fields with dirty-checking — js/hud.js createHud()
+- Gunplay: hitscan vs world and hitboxes, spread, spray, recoil, reload — js/weapons.js tryFire()
+- Weapon data table (7 guns + knife + grenades) — js/config.js WEAPONS
+- Viewmodel with sway, bob, kick, reload, ADS — js/art/viewmodel.js createViewmodel()
+- Weapon meshes composed from data — js/art/weapons-art.js buildWeapon()
+- Tracers, muzzle flash, decals, sparks, shells, dummy targets — js/art/fx.js createFx()
+- WebAudio synth shots, reload, headshot ding — js/audio.js createAudio()
+- HUD: health/ammo, crosshair from spread, hit marker, killfeed — js/hud.js createHud()
 -->
 <html lang="en">
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>SALTLINE — Brinehold (M1)</title>
+<title>SALTLINE — Brinehold (M2)</title>
 <style>
   :root {
     --ink: #e8e2d6; --muted: #9a938a; --accent: #f0a03c; --teal: #2f8f86;
@@ -58,6 +64,25 @@ Reviewer's map (M1: move in the map — the game itself lands in M1–M7):
   #hud-cross::after { left: calc(1px + var(--gap)); top: -1px; width: 5px; height: 2px; }
   #hud-cross i { left: -1px; top: calc(-1px - var(--gap) - 5px); width: 2px; height: 5px; }
   #hud-cross b { left: -1px; top: calc(1px + var(--gap)); width: 2px; height: 5px; }
+  #hud-hitmark {
+    position: absolute; left: 50%; top: 50%; width: 18px; height: 18px;
+    transform: translate(-50%, -50%) rotate(45deg); display: none;
+    border: 2px solid #e8e2d6; box-shadow: 0 0 3px #000;
+  }
+  #hud-killfeed {
+    position: absolute; right: 14px; top: 12px; text-align: right;
+    font-size: 12px; line-height: 1.6; color: var(--ink);
+    text-shadow: 0 1px 3px #000;
+  }
+  #hud-scope {
+    position: absolute; inset: 0; display: none; pointer-events: none;
+    background: radial-gradient(circle at 50% 50%, transparent 26%, rgba(0,0,0,0.96) 27%);
+  }
+  #hud-scope::before, #hud-scope::after {
+    content: ""; position: absolute; background: rgba(232,226,214,0.85);
+  }
+  #hud-scope::before { left: 50%; top: 12%; width: 1px; height: 76%; transform: translateX(-0.5px); }
+  #hud-scope::after { left: 12%; top: 50%; width: 76%; height: 1px; transform: translateY(-0.5px); }
 </style>
 <script type="importmap">{ "imports": { "three": "./three.module.min.js" } }</script>
 </head>
@@ -65,9 +90,12 @@ Reviewer's map (M1: move in the map — the game itself lands in M1–M7):
 <div id="game"></div>
 <div id="hud">
   <div class="panel" id="hud-topleft"><span id="hud-round">ROUND 1</span><br><span class="score"><b>STRAND</b> <span id="hud-score">0 — 0</span> <b style="color:var(--teal)">BASTION</b></span><br><span id="hud-timer">1:45</span></div>
-  <div class="panel" id="hud-bottomleft"><span class="hp" id="hud-hp">100</span> <span style="color:var(--muted)">HP</span><div class="bar"><i id="hud-hpbar"></i></div></div>
-  <div class="panel" id="hud-bottomright"><span class="ammo" id="hud-ammo">— / —</span><br><span style="color:var(--muted)">WREN</span></div>
+  <div id="hud-killfeed"></div>
+  <div class="panel" id="hud-bottomleft"><span class="hp" id="hud-hp">100</span> <span style="color:var(--muted)">HP</span> <span id="hud-armor" style="color:var(--teal); font-size:12px"></span><div class="bar"><i id="hud-hpbar"></i></div></div>
+  <div class="panel" id="hud-bottomright"><span class="ammo" id="hud-ammo">30 / 90</span><br><span id="hud-weapon" style="color:var(--muted)">TALON</span></div>
   <div id="hud-cross"><i></i><b></b></div>
+  <div id="hud-hitmark"></div>
+  <div id="hud-scope"></div>
   <div id="hud-hint">CLICK TO DEPLOY</div>
 </div>
 <script type="module" src="./js/main.js"></script>

@@ -52,6 +52,27 @@ export function raySphere(ox, oy, oz, dx, dy, dz, cx, cy, cz, r, maxDist) {
   return t <= maxDist ? t : -1;
 }
 
+// Ray vs capsule (segment a→b, radius r). Returns distance, or -1.
+// Used for chest/stomach/arm/leg hitboxes (PLAN.md §7).
+export function rayCapsule(ox, oy, oz, dx, dy, dz, ax, ay, az, bx, by, bz, r, maxDist) {
+  const abx = bx - ax, aby = by - ay, abz = bz - az;
+  const aox = ox - ax, aoy = oy - ay, aoz = oz - az;
+  const ab2 = abx * abx + aby * aby + abz * abz;
+  const dAb = dx * abx + dy * aby + dz * abz;
+  const dAo = dx * aox + dy * aoy + dz * aoz;
+  const abAo = abx * aox + aby * aoy + abz * aoz;
+  const a = ab2 - dAb * dAb, b = ab2 * dAo - dAb * abAo, c = ab2 * (aox * aox + aoy * aoy + aoz * aoz - r * r) - abAo * abAo;
+  if (a <= 1e-9) return raySphere(ox, oy, oz, dx, dy, dz, ax, ay, az, r, maxDist);
+  const disc = b * b - a * c;
+  if (disc < 0) return -1;
+  const t = (-b - Math.sqrt(disc)) / a;
+  if (t < 0 || t > maxDist) return -1;
+  const s = (dAb * t + abAo) / ab2; // position along the segment
+  if (s < 0) return raySphere(ox, oy, oz, dx, dy, dz, ax, ay, az, r, maxDist);
+  if (s > 1) return raySphere(ox, oy, oz, dx, dy, dz, bx, by, bz, r, maxDist);
+  return t;
+}
+
 // Point inside AABB (with a small margin for capsule tests).
 export function pointInBox(x, y, z, min, max) {
   return x >= min.x && x <= max.x && y >= min.y && y <= max.y && z >= min.z && z <= max.z;

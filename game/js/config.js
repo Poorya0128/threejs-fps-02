@@ -56,6 +56,41 @@ export const RENDER = {
   maxPointLights: 12,
 };
 
+// --- arsenal (PLAN.md §4.5). All weapon numbers live here, logic in weapons.js.
+// spread in radians: base(stand) | crouchMul | moveMul | airAdd | bloomPerShot.
+// kick pattern: [pitch, yaw] radians per shot index (original shapes).
+export const WEAPONS = {
+  wren:    { name: 'WREN', cls: 'pistol', price: 0, dmg: 28, rpm: 380, auto: false, mag: 15, reserve: 45, reload: 1.1, pellets: 1, falloff: 0.92, noise: 30, spread: [0.004, 0.7, 1.0, 0.03, 0.006], kick: [[0.006, 0], [0.007, 0.001], [0.007, -0.001], [0.008, 0]] },
+  mako:    { name: 'MAKO .45', cls: 'pistol', price: 700, dmg: 52, rpm: 220, auto: false, mag: 7, reserve: 28, reload: 1.4, pellets: 1, falloff: 0.9, noise: 32, spread: [0.006, 0.7, 1.8, 0.035, 0.01], kick: [[0.011, 0], [0.012, 0.002], [0.012, -0.002], [0.013, 0]] },
+  hornet:  { name: 'HORNET', cls: 'smg', price: 1250, dmg: 24, rpm: 850, auto: true, mag: 30, reserve: 120, reload: 1.6, pellets: 1, falloff: 0.8, noise: 35, spread: [0.006, 0.7, 0.6, 0.025, 0.003], kick: [[0.004, 0], [0.004, 0.001], [0.005, -0.001], [0.005, 0.001], [0.005, -0.002], [0.006, 0.002], [0.006, -0.001], [0.006, 0.001]] },
+  breaker: { name: 'BREAKER', cls: 'shotgun', price: 1100, dmg: 9, rpm: 70, auto: false, mag: 6, reserve: 30, reload: 0.6, shell: true, pellets: 9, falloff: 0.75, noise: 40, spread: [0.02, 0.8, 1.0, 0.04, 0], kick: [[0.02, 0]] },
+  talon:   { name: 'TALON', cls: 'rifle', price: 2700, dmg: 34, rpm: 600, auto: true, mag: 30, reserve: 90, reload: 2.2, pellets: 1, falloff: 0.9, noise: 45, spread: [0.0035, 0.7, 1.0, 0.03, 0.004], kick: [[0.007, 0], [0.008, 0.001], [0.009, -0.001], [0.01, 0.002], [0.011, -0.002], [0.012, 0.003], [0.012, -0.003], [0.013, 0.004], [0.013, -0.004], [0.014, 0.005], [0.014, -0.005], [0.015, 0.006], [0.015, -0.006], [0.016, 0.004], [0.016, -0.004], [0.017, 0]] },
+  gavel:   { name: 'GAVEL', cls: 'rifle', price: 3000, dmg: 31, rpm: 660, auto: true, mag: 25, reserve: 75, reload: 2.0, pellets: 1, falloff: 0.92, noise: 45, spread: [0.003, 0.7, 1.0, 0.03, 0.0035], kick: [[0.006, 0], [0.007, 0.001], [0.007, -0.001], [0.008, 0.001], [0.008, -0.001], [0.009, 0.002], [0.009, -0.002], [0.01, 0.001], [0.01, -0.001], [0.01, 0.002], [0.011, -0.002], [0.011, 0]] },
+  longbow: { name: 'LONGBOW', cls: 'marksman', price: 4500, dmg: 112, rpm: 40, auto: false, mag: 5, reserve: 20, reload: 2.8, pellets: 1, falloff: 0.95, noise: 50, scope: true, zoomFov: [40, 15], spread: [0.05, 0.7, 1.0, 0.06, 0.012], scopedSpread: 0.0008, kick: [[0.03, 0]] },
+  cutlass: { name: 'CUTLASS', cls: 'knife', price: 0, dmg: 40, backstab: 65, rpm: 100, auto: false, mag: 0, reserve: 0, reload: 0, pellets: 1, falloff: 1, noise: 0, range: 1.9, spread: [0, 1, 0, 0, 0], kick: [[0, 0]] },
+};
+
+// Hitgroup multipliers (PLAN.md §7). Helm halves the head bonus.
+export const HIT = { head: 4, headHelm: 2.4, chest: 1, stomach: 1, arm: 0.9, leg: 0.75 };
+export const ARMOR_RATIO = 0.5; // body damage split: half to hp, half to armor
+
+// Viewmodel silhouette per weapon (ART.md §9): barrel length, mag style,
+// stock, accent colour. Data only; builders in art/weapons-art.js.
+export const VM = {
+  wren:    { barrel: 0.12, mag: 'straight', stock: false, accent: 0x8a7a5a, grip: 0 },
+  mako:    { barrel: 0.14, mag: 'straight', stock: false, accent: 0x5a5a52, grip: 0 },
+  hornet:  { barrel: 0.2, mag: 'straight', stock: true, accent: 0x2f7f78, grip: 1 },
+  breaker: { barrel: 0.5, mag: 'tube', stock: true, accent: 0x7a5a3c, grip: 0 },
+  talon:   { barrel: 0.4, mag: 'curved', stock: true, accent: 0xf0a03c, grip: 1 },
+  gavel:   { barrel: 0.36, mag: 'straight', stock: true, accent: 0x4a6a7a, grip: 1 },
+  longbow: { barrel: 0.62, mag: 'straight', stock: true, accent: 0x2b4a3a, grip: 0, scope: true },
+  cutlass: { barrel: 0, mag: 'none', stock: false, accent: 0xc8c0b0, grip: 0 },
+};
+
+// Debug only (removed in M6): ?fxhold=1 stretches muzzle-flash and tracer
+// life x20 so a slow headless capture can see them. Same code path.
+export const FXHOLD = new URLSearchParams(location.search).get('fxhold') === '1' ? 20 : 1;
+
 // --- input ---
 export const INPUT = {
   mouseSens: 0.0023, pitchMax: 1.55, fov: 78,
