@@ -5,17 +5,17 @@
 - Movement, capsule vs AABB — js/physics.js stepAgent()
 - Brinehold 110x80 m, Pans/Boiler — js/map.js MAP
 - Waypoints, A* — js/nav.js buildNav()
-- HDR, bloom, ACES — js/art/post.js createPost()
-- Sun, shadow map, PMREM env — js/art/lighting.js buildLighting()
-- Bevelled boxes, baked AO — js/art/geo.js bevelBox()
+- HDR, threshold bloom, ACES — js/art/post.js createPost()
+- Sun, shadow map, PMREM env, sky clouds — js/art/lighting.js buildLighting()
+- Bevelled boxes, baked AO, vessel/signs/pipes, bump — js/art/geo.js buildWorld()
 - Hitscan, spread, spray, recoil, reload — js/weapons.js tryFire()
 - Weapon table (8 guns + knife) — js/config.js WEAPONS
 - Frag / smoke / flash, arcs, bounce, LOS damage — js/grenades.js throwGrenade()
 - Grenades, buy rows, lineups — js/config.js GRENADES, BUY, LINEUPS
-- Viewmodel sway/bob/kick/reload/ADS — js/art/viewmodel.js createViewmodel()
+- Viewmodel sway/bob/kick/reload/ADS, fill light — js/art/viewmodel.js createViewmodel()
 - Weapon meshes from data — js/art/weapons-art.js buildWeapon()
 - Tracers, flash, decals, sparks, shells, explosion, smoke — js/art/fx.js createFx()
-- WebAudio synth — js/audio.js createAudio()
+- WebAudio synth, footsteps, Fuse beep, stingers — js/audio.js createAudio()
 - HUD health/ammo, crosshair, hit marker, killfeed — js/hud.js createHud()
 - Radar, buy menu, flash overlay, headshots — js/hud.js drawRadar(), buyHtml()
 - Bots: routes, holds, LOS, reaction, aim, bursts — js/bots.js botTick()
@@ -31,39 +31,8 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>SALTLINE — Brinehold (M4)</title>
-<style>
-:root{ --ink:#e8e2d6;--muted:#9a938a;--accent:#f0a03c;--teal:#2f8f86;--panel:rgba(20,22,28,0.72);}
- *{ box-sizing:border-box;}
-html,body{ margin:0;height:100%;overflow:hidden;background:#2b2140;color:var(--ink);font-family:ui-monospace,Consolas,monospace;}
- #game,#game canvas{ position:fixed;inset:0;display:block;}#hud{ position:fixed;inset:0;pointer-events:none;font-variant-numeric:tabular-nums;}
-.panel{ position:absolute;background:var(--panel);padding:6px 10px;clip-path:polygon(0 0,calc(100% - 10px) 0,100% 10px,100% 100%,10px 100%,0 calc(100% - 10px));}
- #hud-topleft{ left:14px;top:12px;font-size:13px;line-height:1.5;}#hud-topleft b{ color:var(--accent);}#hud-topleft .score{ font-size:18px;letter-spacing:0.08em;}#hud-bottomleft{ left:14px;bottom:14px;min-width:170px;}#hud-bottomleft .hp{ font-size:26px;line-height:1;}#hud-bottomleft .bar{ height:5px;background:#3a3f46;margin-top:5px;}#hud-bottomleft .bar i{ display:block;height:100%;background:var(--accent);width:100%;}#hud-bottomright{ right:14px;bottom:14px;text-align:right;font-size:13px;line-height:1.5;}#hud-bottomright .ammo{ font-size:22px;}
-#hud-hint{ position:absolute;left:50%;top:58%;transform:translateX(-50%);font-size:14px;letter-spacing:0.14em;color:var(--ink);text-shadow:0 1px 4px #000;}
-#hud-cross{ position:absolute;left:50%;top:50%;width:0;height:0;--gap:6px;}
- #hud-cross::before,#hud-cross::after,
-#hud-cross i,#hud-cross b{ content:"";position:absolute;background:var(--ink);box-shadow:0 0 2px #000;}
- #hud-cross::before{ left:calc(-1px - var(--gap) - 5px);top:-1px;width:5px;height:2px;}#hud-cross::after{ left:calc(1px + var(--gap));top:-1px;width:5px;height:2px;}#hud-cross i{ left:-1px;top:calc(-1px - var(--gap) - 5px);width:2px;height:5px;}#hud-cross b{ left:-1px;top:calc(1px + var(--gap));width:2px;height:5px;}
-#hud-hitmark{ position:absolute;left:50%;top:50%;width:18px;height:18px;transform:translate(-50%,-50%) rotate(45deg);display:none;border:2px solid #e8e2d6;box-shadow:0 0 3px #000;}
-#hud-killfeed{ position:absolute;right:14px;top:12px;text-align:right;font-size:12px;line-height:1.6;color:var(--ink);text-shadow:0 1px 3px #000;}
-#hud-scope{ position:absolute;inset:0;display:none;pointer-events:none;background:radial-gradient(circle at 50% 50%,transparent 26%,rgba(0,0,0,0.96) 27%);}
-#hud-scope::before,#hud-scope::after{ content:"";position:absolute;background:rgba(232,226,214,0.85);}
- #hud-scope::before{ left:50%;top:12%;width:1px;height:76%;transform:translateX(-0.5px);}#hud-scope::after{ left:12%;top:50%;width:76%;height:1px;transform:translateY(-0.5px);}
-#hud-banner{ position:absolute;left:50%;top:22%;transform:translateX(-50%);font-size:26px;letter-spacing:0.2em;color:var(--accent);text-shadow:0 2px 8px #000;white-space:nowrap;}
-#hud-progress{ position:absolute;left:50%;top:62%;transform:translateX(-50%);width:260px;text-align:center;font-size:12px;letter-spacing:0.12em;text-shadow:0 1px 3px #000;}
- #hud-progress .bar{ height:6px;background:#3a3f46;margin-top:4px;}#hud-progress .bar i{ display:block;height:100%;background:var(--accent);width:0;}
-#hud-scoreboard{ position:absolute;left:50%;top:50%;transform:translate(-50%,-50%);width:460px;background:var(--panel);padding:14px 18px;font-size:13px;line-height:1.9;}
- #hud-scoreboard h3{ margin:0 0 6px;font-size:15px;letter-spacing:0.14em;color:var(--accent);}#hud-scoreboard div{ display:flex;justify-content:space-between;}#hud-scoreboard .dead{ color:var(--muted);}
-#hud-spectate{ position:absolute;left:50%;bottom:76px;transform:translateX(-50%);font-size:13px;letter-spacing:0.12em;color:var(--teal);text-shadow:0 1px 3px #000;}
-#hud-radar{ position:absolute;left:14px;top:118px;width:140px;height:140px;border:1px solid rgba(232,226,214,0.25);}
-#hud-flash{ position:absolute;inset:0;background:#fff;opacity:0;pointer-events:none;}
-#hud-buy{ position:absolute;left:50%;top:50%;transform:translate(-50%,-50%);width:420px;background:var(--panel);padding:14px 18px;font-size:13px;line-height:1.9;pointer-events:auto;}
- #hud-buy h3{ margin:0 0 4px;font-size:15px;letter-spacing:0.14em;color:var(--accent);}#hud-buy .buy-money{ color:var(--accent);margin-bottom:6px;}#hud-buy .buy-row{ display:flex;gap:10px;cursor:pointer;}#hud-buy .buy-row:hover{ background:rgba(240,160,60,0.15);}#hud-buy .buy-row.off{ color:var(--muted);cursor:default;}#hud-buy .buy-row.owned{ color:var(--teal);}#hud-buy .buy-key{ width:18px;color:var(--accent);}#hud-buy .buy-row span:nth-child(2){ flex:1;}
-.overlay{ position:fixed;inset:0;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:14px;background:rgba(12,10,18,0.78);z-index:10;text-align:center;}
- .overlay h1{ margin:0;font-size:44px;letter-spacing:0.3em;color:var(--accent);}.overlay h2{ margin:0;font-size:15px;letter-spacing:0.18em;color:var(--muted);font-weight:normal;}
-.overlay button{ font:inherit;font-size:16px;letter-spacing:0.14em;cursor:pointer;color:#14161c;background:var(--accent);border:0;padding:12px 34px;}
- .overlay button.ghost{ background:transparent;color:var(--ink);border:1px solid var(--muted);}.overlay .keys{ font-size:12px;line-height:1.9;color:var(--muted);}.overlay label{ font-size:13px;color:var(--ink);}.overlay label input,.overlay label select{ margin-left:8px;accent-color:var(--accent);}.overlay .row{ display:flex;gap:22px;align-items:center;}
-</style>
+<title>SALTLINE — Brinehold (M5)</title>
+<style>:root{--ink:#e8e2d6;--muted:#9a938a;--accent:#f0a03c;--teal:#2f8f86;--panel:rgba(20,22,28,0.72);}*{box-sizing:border-box;}html,body{margin:0;height:100%;overflow:hidden;background:#2b2140;color:var(--ink);font-family:ui-monospace,Consolas,monospace;}#game,#game canvas{position:fixed;inset:0;display:block;}#hud{position:fixed;inset:0;pointer-events:none;font-variant-numeric:tabular-nums;}.panel{position:absolute;background:var(--panel);padding:6px 10px;clip-path:polygon(0 0,calc(100% - 10px) 0,100% 10px,100% 100%,10px 100%,0 calc(100% - 10px));}#hud-topleft{left:14px;top:12px;font-size:13px;line-height:1.5;}#hud-topleft b{color:var(--accent);}#hud-topleft .score{font-size:18px;letter-spacing:0.08em;}#hud-bottomleft{left:14px;bottom:14px;min-width:170px;}#hud-bottomleft .hp{font-size:26px;line-height:1;}#hud-bottomleft .bar{height:5px;background:#3a3f46;margin-top:5px;}#hud-bottomleft .bar i{display:block;height:100%;background:var(--accent);width:100%;}#hud-bottomright{right:14px;bottom:14px;text-align:right;font-size:13px;line-height:1.5;}#hud-bottomright .ammo{font-size:22px;}#hud-hint{position:absolute;left:50%;top:58%;transform:translateX(-50%);font-size:14px;letter-spacing:0.14em;color:var(--ink);text-shadow:0 1px 4px #000;}#hud-cross{position:absolute;left:50%;top:50%;width:0;height:0;--gap:6px;}#hud-cross::before,#hud-cross::after,#hud-cross i,#hud-cross b{content:"";position:absolute;background:var(--ink);box-shadow:0 0 2px #000;}#hud-cross::before{left:calc(-1px - var(--gap) - 5px);top:-1px;width:5px;height:2px;}#hud-cross::after{left:calc(1px + var(--gap));top:-1px;width:5px;height:2px;}#hud-cross i{left:-1px;top:calc(-1px - var(--gap) - 5px);width:2px;height:5px;}#hud-cross b{left:-1px;top:calc(1px + var(--gap));width:2px;height:5px;}#hud-hitmark{position:absolute;left:50%;top:50%;width:18px;height:18px;transform:translate(-50%,-50%) rotate(45deg);display:none;border:2px solid #e8e2d6;box-shadow:0 0 3px #000;}#hud-killfeed{position:absolute;right:14px;top:12px;text-align:right;font-size:12px;line-height:1.6;color:var(--ink);text-shadow:0 1px 3px #000;}#hud-scope{position:absolute;inset:0;display:none;pointer-events:none;background:radial-gradient(circle at 50% 50%,transparent 26%,rgba(0,0,0,0.96) 27%);}#hud-scope::before,#hud-scope::after{content:"";position:absolute;background:rgba(232,226,214,0.85);}#hud-scope::before{left:50%;top:12%;width:1px;height:76%;transform:translateX(-0.5px);}#hud-scope::after{left:12%;top:50%;width:76%;height:1px;transform:translateY(-0.5px);}#hud-banner{position:absolute;left:50%;top:22%;transform:translateX(-50%);font-size:26px;letter-spacing:0.2em;color:var(--accent);text-shadow:0 2px 8px #000;white-space:nowrap;}#hud-progress{position:absolute;left:50%;top:62%;transform:translateX(-50%);width:260px;text-align:center;font-size:12px;letter-spacing:0.12em;text-shadow:0 1px 3px #000;}#hud-progress .bar{height:6px;background:#3a3f46;margin-top:4px;}#hud-progress .bar i{display:block;height:100%;background:var(--accent);width:0;}#hud-scoreboard{position:absolute;left:50%;top:50%;transform:translate(-50%,-50%);width:460px;background:var(--panel);padding:14px 18px;font-size:13px;line-height:1.9;}#hud-scoreboard h3{margin:0 0 6px;font-size:15px;letter-spacing:0.14em;color:var(--accent);}#hud-scoreboard div{display:flex;justify-content:space-between;}#hud-scoreboard .dead{color:var(--muted);}#hud-spectate{position:absolute;left:50%;bottom:76px;transform:translateX(-50%);font-size:13px;letter-spacing:0.12em;color:var(--teal);text-shadow:0 1px 3px #000;}#hud-radar{position:absolute;left:14px;top:118px;width:140px;height:140px;border:1px solid rgba(232,226,214,0.25);}#hud-flash{position:absolute;inset:0;background:#fff;opacity:0;pointer-events:none;}#hud-buy{position:absolute;left:50%;top:50%;transform:translate(-50%,-50%);width:420px;background:var(--panel);padding:14px 18px;font-size:13px;line-height:1.9;pointer-events:auto;}#hud-buy h3{margin:0 0 4px;font-size:15px;letter-spacing:0.14em;color:var(--accent);}#hud-buy .buy-money{color:var(--accent);margin-bottom:6px;}#hud-buy .buy-row{display:flex;gap:10px;cursor:pointer;}#hud-buy .buy-row:hover{background:rgba(240,160,60,0.15);}#hud-buy .buy-row.off{color:var(--muted);cursor:default;}#hud-buy .buy-row.owned{color:var(--teal);}#hud-buy .buy-key{width:18px;color:var(--accent);}#hud-buy .buy-row span:nth-child(2){flex:1;}.overlay{position:fixed;inset:0;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:14px;background:rgba(12,10,18,0.78);z-index:10;text-align:center;}.overlay h1{margin:0;font-size:44px;letter-spacing:0.3em;color:var(--accent);}.overlay h2{margin:0;font-size:15px;letter-spacing:0.18em;color:var(--muted);font-weight:normal;}.overlay button{font:inherit;font-size:16px;letter-spacing:0.14em;cursor:pointer;color:#14161c;background:var(--accent);border:0;padding:12px 34px;}.overlay button.ghost{background:transparent;color:var(--ink);border:1px solid var(--muted);}.overlay .keys{font-size:12px;line-height:1.9;color:var(--muted);}.overlay label{font-size:13px;color:var(--ink);}.overlay label input,.overlay label select{margin-left:8px;accent-color:var(--accent);}.overlay .row{display:flex;gap:22px;align-items:center;}</style>
 <script type="importmap">{ "imports": { "three": "./three.module.min.js" } }</script>
 </head>
 <body>

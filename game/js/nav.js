@@ -1,5 +1,4 @@
 // SALTLINE nav.js — waypoint graph, auto-linking, A* (PLAN.md §9.1).
-import { rayAABB } from './math.js';
 
 const MAX_LINK_DIST = 20;
 

@@ -29,36 +29,25 @@ export function createPost(renderer) {
     ups.push(new THREE.WebGLRenderTarget(Math.max(2, bw >> i), Math.max(2, bh >> i), { type: THREE.HalfFloatType }));
   }
   const downMat = quadMaterial(`
-    varying vec2 vUv; uniform sampler2D tSrc; uniform vec2 texel;
+    varying vec2 vUv; uniform sampler2D tSrc; uniform vec2 texel; uniform float uThresh;
     void main(){
-      vec3 c = texture2D(tSrc, vUv).rgb * 0.25;
-      c += texture2D(tSrc, vUv + texel * vec2(-1.0, -1.0)).rgb * 0.0625;
-      c += texture2D(tSrc, vUv + texel * vec2( 1.0, -1.0)).rgb * 0.0625;
-      c += texture2D(tSrc, vUv + texel * vec2(-1.0,  1.0)).rgb * 0.0625;
-      c += texture2D(tSrc, vUv + texel * vec2( 1.0,  1.0)).rgb * 0.0625;
-      c += texture2D(tSrc, vUv + texel * vec2(-2.0, 0.0)).rgb * 0.0625;
-      c += texture2D(tSrc, vUv + texel * vec2( 2.0, 0.0)).rgb * 0.0625;
-      c += texture2D(tSrc, vUv + texel * vec2(0.0, -2.0)).rgb * 0.0625;
-      c += texture2D(tSrc, vUv + texel * vec2(0.0,  2.0)).rgb * 0.0625;
-      c += texture2D(tSrc, vUv + texel * vec2(-1.0, 0.0)).rgb * 0.125;
-      c += texture2D(tSrc, vUv + texel * vec2( 1.0, 0.0)).rgb * 0.125;
-      c += texture2D(tSrc, vUv + texel * vec2(0.0, -1.0)).rgb * 0.125;
-      c += texture2D(tSrc, vUv + texel * vec2(0.0,  1.0)).rgb * 0.125;
-      gl_FragColor = vec4(c, 1.0);
-    }`, { tSrc: { value: null }, texel: { value: new THREE.Vector2() } });
+      vec3 c = vec3(0.0);
+      for (int i = -2; i <= 2; i++) for (int j = -2; j <= 2; j++) {
+        int m = abs(i) + abs(j);
+        float w = (i == 0 && j == 0) ? 4.0 : m == 1 ? 2.0 : (m == 2 && (i == 0 || j == 0 || abs(i) == 1)) ? 1.0 : 0.0;
+        c += texture2D(tSrc, vUv + texel * vec2(float(i), float(j))).rgb * w;
+      }
+      gl_FragColor = vec4(max(c * 0.0625 - vec3(uThresh), 0.0), 1.0);
+    }`, { tSrc: { value: null }, texel: { value: new THREE.Vector2() }, uThresh: { value: 0 } });
   const upMat = quadMaterial(`
     varying vec2 vUv; uniform sampler2D tSrc; uniform sampler2D tAdd; uniform vec2 texel; uniform float uHasAdd;
     void main(){
       vec3 c = vec3(0.0);
-      c += texture2D(tSrc, vUv + texel * vec2(-1.0, -1.0)).rgb * 0.0625;
-      c += texture2D(tSrc, vUv + texel * vec2( 1.0, -1.0)).rgb * 0.0625;
-      c += texture2D(tSrc, vUv + texel * vec2(-1.0,  1.0)).rgb * 0.0625;
-      c += texture2D(tSrc, vUv + texel * vec2( 1.0,  1.0)).rgb * 0.0625;
-      c += texture2D(tSrc, vUv + texel * vec2(-1.0, 0.0)).rgb * 0.125;
-      c += texture2D(tSrc, vUv + texel * vec2( 1.0, 0.0)).rgb * 0.125;
-      c += texture2D(tSrc, vUv + texel * vec2(0.0, -1.0)).rgb * 0.125;
-      c += texture2D(tSrc, vUv + texel * vec2(0.0,  1.0)).rgb * 0.125;
-      c += texture2D(tSrc, vUv).rgb * 0.25;
+      for (int i = -1; i <= 1; i++) for (int j = -1; j <= 1; j++) {
+        float w = (i == 0 && j == 0) ? 4.0 : (abs(i) + abs(j) == 1) ? 2.0 : 1.0;
+        c += texture2D(tSrc, vUv + texel * vec2(float(i), float(j))).rgb * w;
+      }
+      c *= 0.0625;
       if (uHasAdd > 0.5) c += texture2D(tAdd, vUv).rgb;
       gl_FragColor = vec4(c, 1.0);
     }`, { tSrc: { value: null }, tAdd: { value: null }, texel: { value: new THREE.Vector2() }, uHasAdd: { value: 0 } });
@@ -97,6 +86,7 @@ export function createPost(renderer) {
     let cur = src;
     for (let i = 0; i < blooms.length; i++) {
       downMat.uniforms.tSrc.value = cur.texture;
+      downMat.uniforms.uThresh.value = i === 0 ? RENDER.bloomThreshold : 0;
       const t = blooms[i];
       downMat.uniforms.texel.value.set(1 / t.width, 1 / t.height);
       quad.material = downMat;
@@ -127,10 +117,7 @@ export function createPost(renderer) {
     target: hdr,
     resize(w2, h2) {
       hdr.setSize(w2, h2);
-      for (let i = 0; i < blooms.length; i++) {
-        blooms[i].setSize(Math.max(2, (w2 >> 1) >> i), Math.max(2, (h2 >> 1) >> i));
-        ups[i].setSize(Math.max(2, (w2 >> 1) >> i), Math.max(2, (h2 >> 1) >> i));
-      }
+      for (const arr of [blooms, ups]) for (let i = 0; i < arr.length; i++) arr[i].setSize(Math.max(2, (w2 >> 1) >> i), Math.max(2, (h2 >> 1) >> i));
     },
     finish(renderer, time) {
       const bloomTex = renderBloom(renderer, hdr);

@@ -1,6 +1,7 @@
 // SALTLINE art/geo.js — geometry kit (ART.md §4). Every box is bevelled
 import * as THREE from 'three';
 import { MATERIALS } from '../config.js';
+import { rayAABB } from '../math.js';
 
 export function bevelBox(sx, sy, sz, r = 0.03) {
   const w = Math.max(sx - 2 * r, 0.02), h = Math.max(sy - 2 * r, 0.02);
@@ -95,14 +96,7 @@ export function bakeAO(geo, boxes) {
     const list = near(ox, oy, oz);
     for (let i = 0; i < list.length; i++) {
       const b = list[i];
-      let t0r = 0, t1r = 0.8;
-      if (dx !== 0) { const ix = 1 / dx; let a = (b.min.x - ox) * ix, c = (b.max.x - ox) * ix; if (a > c) { const t = a; a = c; c = t; } t0r = Math.max(t0r, a); t1r = Math.min(t1r, c); if (t0r > t1r) continue; }
-      else if (ox < b.min.x || ox > b.max.x) continue;
-      if (dy !== 0) { const iy = 1 / dy; let a = (b.min.y - oy) * iy, c = (b.max.y - oy) * iy; if (a > c) { const t = a; a = c; c = t; } t0r = Math.max(t0r, a); t1r = Math.min(t1r, c); if (t0r > t1r) continue; }
-      else if (oy < b.min.y || oy > b.max.y) continue;
-      if (dz !== 0) { const iz = 1 / dz; let a = (b.min.z - oz) * iz, c = (b.max.z - oz) * iz; if (a > c) { const t = a; a = c; c = t; } t0r = Math.max(t0r, a); t1r = Math.min(t1r, c); if (t0r > t1r) continue; }
-      else if (oz < b.min.z || oz > b.max.z) continue;
-      if (t0r > 0.02) return true;
+      if (rayAABB(ox, oy, oz, dx, dy, dz, b.min, b.max, 0.8) > 0.02) return true;
     }
     return false;
   };
@@ -124,8 +118,49 @@ export function bakeAO(geo, boxes) {
   return performance.now() - t0;
 }
 
+function noiseTexture() {
+  const c = document.createElement('canvas'); c.width = c.height = 128;
+  const x = c.getContext('2d');
+  const img = x.createImageData(128, 128);
+  for (let i = 0; i < img.data.length; i += 4) {
+    const v = 118 + Math.floor(Math.random() * 20);
+    img.data[i] = img.data[i + 1] = img.data[i + 2] = v; img.data[i + 3] = 255;
+  }
+  x.putImageData(img, 0, 0);
+  const t = new THREE.CanvasTexture(c);
+  t.wrapS = t.wrapT = THREE.RepeatWrapping;
+  return t;
+}
+
+function signTexture(text) {
+  const c = document.createElement('canvas'); c.width = 256; c.height = 64;
+  const x = c.getContext('2d');
+  x.fillStyle = '#1d1d1f'; x.fillRect(0, 0, 256, 64);
+  x.fillStyle = '#f0a03c'; x.font = 'bold 38px monospace'; x.textAlign = 'center'; x.textBaseline = 'middle';
+  x.fillText(text, 128, 34);
+  return new THREE.CanvasTexture(c);
+}
+
+function dressWorld(scene) {
+  const rust = new THREE.MeshStandardMaterial({ color: 0x8a4a2c, roughness: 0.9, metalness: 0.2 });
+  const teal = new THREE.MeshStandardMaterial({ color: 0x2f7f78, roughness: 0.6, metalness: 0.4 });
+  const dark = new THREE.MeshStandardMaterial({ color: 0x30343a, roughness: 0.5, metalness: 0.9 });
+  const add = (mesh, x, y, z, ry = 0) => { mesh.position.set(x, y, z); mesh.rotation.y = ry; mesh.castShadow = true; mesh.receiveShadow = true; scene.add(mesh); return mesh; };
+  // Boiler vessel (14,1.5,33, 6x3x4): rim band, waist band, face pipes, gauge.
+  add(new THREE.Mesh(new THREE.BoxGeometry(6.3, 0.18, 4.3), rust), 14, 2.9, 33);
+  add(new THREE.Mesh(new THREE.BoxGeometry(6.15, 0.12, 4.15), teal), 14, 1.5, 33);
+  for (const [x, r] of [[11.8, 0.09], [13.2, 0.07], [16.2, 0.09]]) {
+    add(new THREE.Mesh(new THREE.CylinderGeometry(r, r, 3.1, 8), dark), x, 1.55, 30.9);
+  }
+  // Signs: BOILER above the hall door, PANS on the pumphouse beam.
+  for (const [text, x, y, z, w, h] of [['BOILER', 14.75, 4.5, 22.6, 4, 1], ['PANS', -2, 3.5, -10.4, 3, 0.75]]) {
+    add(new THREE.Mesh(new THREE.PlaneGeometry(w, h), new THREE.MeshStandardMaterial({ map: signTexture(text), roughness: 0.7 })), x, y, z);
+  }
+}
+
 export function buildWorld(scene, boxes) {
   const t0 = performance.now();
+  const noise = noiseTexture();
   const byMat = new Map();
   for (const b of boxes) {
     if (!byMat.has(b.mat)) byMat.set(b.mat, []);
@@ -133,12 +168,17 @@ export function buildWorld(scene, boxes) {
   }
   for (const [matId, list] of byMat) {
     const geos = [];
-    for (const b of list) {
+    for (let bi = 0; bi < list.length; bi++) {
+      const b = list[bi];
       const sx = b.max.x - b.min.x, sy = b.max.y - b.min.y, sz = b.max.z - b.min.z;
       if (sx < 0.05 || sy < 0.05 || sz < 0.05) continue;
       const g = bevelBox(sx, sy, sz, 0.03);
       g.translate((b.min.x + b.max.x) / 2, (b.min.y + b.max.y) / 2, (b.min.z + b.max.z) / 2);
       applyWorldUV(g);
+      const n = g.attributes.position.count;
+      const col = new Float32Array(n * 3);
+      col.fill(0.88 + ((bi * 37) % 10) / 60);
+      g.setAttribute('color', new THREE.BufferAttribute(col, 3));
       geos.push(g);
     }
     if (!geos.length) continue;
@@ -146,7 +186,7 @@ export function buildWorld(scene, boxes) {
     const preset = MATERIALS[matId] ?? MATERIALS[0];
     const mat = new THREE.MeshStandardMaterial({
       color: preset.color, roughness: preset.roughness, metalness: preset.metalness,
-      vertexColors: true,
+      vertexColors: true, bumpMap: noise, bumpScale: 1.0,
     });
     const mesh = new THREE.Mesh(merged, mat);
     mesh.castShadow = true; mesh.receiveShadow = true;
@@ -154,5 +194,6 @@ export function buildWorld(scene, boxes) {
     const ms = bakeAO(merged, boxes);
     if (matId === 0) console.log(`[saltline] AO bake: ${ms.toFixed(0)} ms`);
   }
+  dressWorld(scene);
   console.log(`[saltline] world built in ${(performance.now() - t0).toFixed(0)} ms`);
 }

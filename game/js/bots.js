@@ -9,6 +9,12 @@ import { plantCharge, defuseCharge } from './rounds.js';
 
 const _d = { x: 0, y: 0, z: 0 };
 
+const wrapAngle = (a) => {
+  while (a > Math.PI) a -= 2 * Math.PI;
+  while (a < -Math.PI) a += 2 * Math.PI;
+  return a;
+};
+
 export function createBrain(skill) {
   return {
     skill, state: 'buy', route: [], routeI: 0,
@@ -125,10 +131,7 @@ function aimAt(bot, tx, ty, tz, dt, rate) {
   const dx = tx - bot.pos.x, dy = ty - (bot.pos.y + bot.eyeHeight), dz = tz - bot.pos.z;
   const yaw = Math.atan2(-dx, -dz) - bot.recoil.yaw;
   const pitch = Math.atan2(dy, Math.hypot(dx, dz)) - bot.recoil.pitch;
-  let dyaw = yaw - bot.yaw;
-  while (dyaw > Math.PI) dyaw -= 2 * Math.PI;
-  while (dyaw < -Math.PI) dyaw += 2 * Math.PI;
-  bot.yaw += dyaw * (1 - Math.exp(-rate * dt));
+  bot.yaw += wrapAngle(yaw - bot.yaw) * (1 - Math.exp(-rate * dt));
   bot.pitch = damp(bot.pitch, clamp(pitch, -1.55, 1.55), rate, dt);
 }
 
@@ -200,11 +203,7 @@ function moveToward(state, bot, tx, tz, dt, out) {
   } else if (d > 0.01) { mx = dx / d; mz = dz / d; }
   else { mx = 0; mz = 0; }
   if (mx || mz) {
-    const want = Math.atan2(-mx, -mz);
-    let dyaw = want - bot.yaw;
-    while (dyaw > Math.PI) dyaw -= 2 * Math.PI;
-    while (dyaw < -Math.PI) dyaw += 2 * Math.PI;
-    bot.yaw += clamp(dyaw, -6 * dt, 6 * dt);
+    bot.yaw += clamp(wrapAngle(Math.atan2(-mx, -mz) - bot.yaw), -6 * dt, 6 * dt);
   }
   out.x = mx; out.z = mz;
   return d;
@@ -419,14 +418,14 @@ function botTick(state, bot, dt) {
     }
   }
   if (state.phase === 'planted') {
-    if (bot.team === 'strand' && br.state !== 'engage') {
+    if (bot.team === 'strand' && br.state !== 'engage' && br.state !== 'holdAngle') {
       const site = state.fuse.site === 'boiler' ? 4 : 2;
-      const cands = state.nodes.map((n, i) => [i, n]).filter(([, n]) => (n[4] & site) && (n[4] & 1));
-      if (cands.length && br.state !== 'holdAngle') {
-        br.route = [cands[Math.floor(state.rng() * cands.length)][0]];
-        br.routeI = 0;
-        br.state = 'holdAngle';
+      let n0 = -1, count = 0;
+      for (let i = 0; i < state.nodes.length; i++) {
+        const n = state.nodes[i];
+        if ((n[4] & site) && (n[4] & 1) && state.rng() < 1 / ++count) n0 = i;
       }
+      if (n0 >= 0) { br.route = [n0]; br.routeI = 0; br.state = 'holdAngle'; }
     } else if (bot.team === 'bastion' && br.state !== 'engage' && br.state !== 'defuse') {
       const mates = state.agents.filter((a) => a.isBot && a.team === 'bastion' && a.alive && a !== bot).length;
       if (mates >= 1 || state.roundT < 15) br.state = 'defuse';

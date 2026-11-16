@@ -56,10 +56,10 @@ export function computeSpread(a) {
 }
 
 export function applyRecoil(state, a, w) {
-  const pat = w.kick, i = Math.min(a.shotsFired, pat.length - 1);
+  const k = w.kick, i = Math.min(a.shotsFired, k[3] - 1);
   const j = (state.rng() - 0.5) * 0.3;
-  a.recoil.pitch += pat[i][0] * (1 + j);
-  a.recoil.yaw += pat[i][1] * (1 + j);
+  a.recoil.pitch += (k[0] + k[1] * i) * (1 + j);
+  a.recoil.yaw += (i % 2 ? k[2] : -k[2]) * (i ? 0.5 + 0.5 * i / Math.max(1, k[3] - 1) : 0) * (1 + j);
   a.spreadBloom += w.spread[4];
   a.shotsFired++;
   a.lastShotT = state.time;
@@ -71,29 +71,23 @@ function traceAgent(ox, oy, oz, dx, dy, dz, t, maxDist) {
   const rx = Math.cos(t.yaw), rz = -Math.sin(t.yaw);
   let best = -1, group = '';
   const test = (tt, g) => { if (tt >= 0 && tt < maxDist && (best < 0 || tt < best)) { best = tt; group = g; } };
+  const cap = (ax, ay, az, bx, by, bz, r, g) => test(rayCapsule(ox, oy, oz, dx, dy, dz, ax, ay, az, bx, by, bz, r, maxDist), g);
+  cap(t.pos.x, eyeY - 0.12, t.pos.z, t.pos.x, eyeY - 0.52, t.pos.z, 0.24, 'chest');
+  cap(t.pos.x, eyeY - 0.52, t.pos.z, t.pos.x, eyeY - 0.85, t.pos.z, 0.22, 'stomach');
   test(raySphere(ox, oy, oz, dx, dy, dz, t.pos.x, eyeY + 0.05, t.pos.z, 0.14, maxDist), 'head');
-  test(rayCapsule(ox, oy, oz, dx, dy, dz, t.pos.x, eyeY - 0.12, t.pos.z, t.pos.x, eyeY - 0.52, t.pos.z, 0.24, maxDist), 'chest');
-  test(rayCapsule(ox, oy, oz, dx, dy, dz, t.pos.x, eyeY - 0.52, t.pos.z, t.pos.x, eyeY - 0.85, t.pos.z, 0.22, maxDist), 'stomach');
   for (let s = -1; s <= 1; s += 2) {
     const sx = t.pos.x + rx * 0.3 * s, sz = t.pos.z + rz * 0.3 * s;
-    test(rayCapsule(ox, oy, oz, dx, dy, dz, sx, eyeY - 0.18, sz, sx + fx * 0.08, eyeY - 0.78, sz + fz * 0.08, 0.09, maxDist), 'arm');
+    cap(sx, eyeY - 0.18, sz, sx + fx * 0.08, eyeY - 0.78, sz + fz * 0.08, 0.09, 'arm');
     const lx = t.pos.x + rx * 0.12 * s, lz = t.pos.z + rz * 0.12 * s;
-    test(rayCapsule(ox, oy, oz, dx, dy, dz, lx, eyeY - 0.85, lz, lx, t.pos.y + 0.05, lz, 0.11, maxDist), 'leg');
+    cap(lx, eyeY - 0.85, lz, lx, t.pos.y + 0.05, lz, 0.11, 'leg');
   }
   return best < 0 ? null : { t: best, target: t, group };
 }
 
 function boxNormal(b, p) {
-  const dxl = p.x - b.min.x, dxr = b.max.x - p.x;
-  const dyl = p.y - b.min.y, dyr = b.max.y - p.y;
-  const dzl = p.z - b.min.z, dzr = b.max.z - p.z;
-  const m = Math.min(dxl, dxr, dyl, dyr, dzl, dzr);
-  if (m === dxl) return _v3.set(-1, 0, 0);
-  if (m === dxr) return _v3.set(1, 0, 0);
-  if (m === dyl) return _v3.set(0, -1, 0);
-  if (m === dyr) return _v3.set(0, 1, 0);
-  if (m === dzl) return _v3.set(0, 0, -1);
-  return _v3.set(0, 0, 1);
+  const d = [p.x - b.min.x, b.max.x - p.x, p.y - b.min.y, b.max.y - p.y, p.z - b.min.z, b.max.z - p.z];
+  const i = d.indexOf(Math.min(...d));
+  return _v3.set(i === 0 ? -1 : i === 1 ? 1 : 0, i === 2 ? -1 : i === 3 ? 1 : 0, i === 4 ? -1 : i === 5 ? 1 : 0);
 }
 
 export function traceShot(state, shooter, ox, oy, oz, dx, dy, dz, maxDist) {
@@ -147,7 +141,7 @@ export function applyHit(state, shooter, target, group, dmg, dist, w) {
 function muzzlePos(a, out) {
   eyePos(a, out);
   viewDir(a, _dir);
-  _right.set(Math.cos(a.yaw), 0, -Math.sin(a.yaw));
+  rightOf(a, _right);
   out.addScaledVector(_dir, 0.55).addScaledVector(_right, 0.18);
   out.y -= 0.16;
   return out;
@@ -174,11 +168,13 @@ export function switchWeapon(state, a, idx) {
   a.shotsFired = 0; a.recoil.pitch = 0; a.recoil.yaw = 0; a.spreadBloom = 0;
 }
 
+function rightOf(a, out) { return out.set(Math.cos(a.yaw), 0, -Math.sin(a.yaw)); }
+
 function firePellet(state, a, w, ex, ey, ez, mx, my, mz, spread, every3rd) {
   viewDir(a, _dir);
   if (spread > 0) {
     const rx = (state.rng() - 0.5) * 2 * spread, ry = (state.rng() - 0.5) * 2 * spread;
-    _right.set(Math.cos(a.yaw), 0, -Math.sin(a.yaw));
+    rightOf(a, _right);
     _dir.addScaledVector(_right, rx).addScaledVector(_up.set(0, 1, 0), ry).normalize();
   }
   const hit = traceShot(state, a, ex, ey, ez, _dir.x, _dir.y, _dir.z, 200);

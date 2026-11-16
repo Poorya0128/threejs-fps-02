@@ -22,6 +22,9 @@ export function createViewmodel(vmScene) {
   const flashLight = new THREE.PointLight(0xffc27a, 0, 3, 1.6);
   flash.add(flashLight);
   vmScene.add(flash);
+  const fill = new THREE.PointLight(0xffe0b8, 0.85, 1.6, 2);
+  fill.position.set(0.12, 0.18, 0.28);
+  group.add(fill);
   const _mw = new THREE.Vector3();
   const glove = new THREE.MeshStandardMaterial({ color: 0x3a352c, metalness: 0, roughness: 0.85 });
   const handR = new THREE.Mesh(new THREE.BoxGeometry(0.07, 0.05, 0.11), glove);

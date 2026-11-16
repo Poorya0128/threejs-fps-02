@@ -3,9 +3,7 @@ import * as THREE from 'three';
 
 export const _v0 = new THREE.Vector3();
 export const _v1 = new THREE.Vector3();
-export const _v2 = new THREE.Vector3();
 export const _v3 = new THREE.Vector3();
-export const _v4 = new THREE.Vector3();
 
 export const clamp = (x, a, b) => (x < a ? a : x > b ? b : x);
 export const lerp = (a, b, t) => a + (b - a) * t;

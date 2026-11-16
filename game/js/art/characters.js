@@ -18,7 +18,7 @@ export function createCharacters(scene) {
   const stripGeo = new THREE.BoxGeometry(0.32, 0.03, 0.02);
   const gunGeo = new THREE.BoxGeometry(0.05, 0.1, 0.55);
   const barrelGeo = new THREE.CylinderGeometry(0.018, 0.018, 0.28, 8);
-  const patchGeo = new THREE.BoxGeometry(0.1, 0.05, 0.02);
+  const patchGeo = new THREE.BoxGeometry(0.14, 0.07, 0.02);
   const visorGeo = new THREE.BoxGeometry(0.2, 0.06, 0.04);
   const padGeo = new THREE.BoxGeometry(0.13, 0.1, 0.04);
   const stripMat = new THREE.MeshStandardMaterial({ color: 0xf0a03c, emissive: 0xf0a03c, emissiveIntensity: 1.6 });
@@ -32,7 +32,7 @@ export function createCharacters(scene) {
     mats[t] = {
       cloth: new THREE.MeshStandardMaterial({ color: c.cloth, roughness: 0.85 }),
       gear: new THREE.MeshStandardMaterial({ color: c.gear, roughness: 0.6, metalness: 0.2 }),
-      accent: new THREE.MeshStandardMaterial({ color: c.accent, roughness: 0.5, emissive: c.accent, emissiveIntensity: 0.25 }),
+      accent: new THREE.MeshStandardMaterial({ color: c.accent, roughness: 0.5, emissive: c.accent, emissiveIntensity: 0.45 }),
       head: new THREE.MeshStandardMaterial({ color: c.head, roughness: 0.85 }),
     };
   }

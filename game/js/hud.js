@@ -5,16 +5,8 @@ import { computeSpread, activeWeapon, activeId } from './weapons.js';
 import { buyItem } from './economy.js';
 
 export function createHud() {
-  const el = {
-    hp: $('hud-hp'), hpBar: $('hud-hpbar'), armor: $('hud-armor'),
-    ammo: $('hud-ammo'), weapon: $('hud-weapon'), timer: $('hud-timer'),
-    score: $('hud-score'), round: $('hud-round'), hint: $('hud-hint'),
-    cross: $('hud-cross'), hitmark: $('hud-hitmark'), killfeed: $('hud-killfeed'),
-    scope: $('hud-scope'), money: $('hud-money'), pips: $('hud-pips'),
-    banner: $('hud-banner'), progress: $('hud-progress'), progBar: $('hud-progbar'),
-    progLabel: $('hud-proglabel'), board: $('hud-scoreboard'), spec: $('hud-spectate'),
-    buy: $('hud-buy'), flash: $('hud-flash'),
-  };
+  const el = {};
+  for (const [k, s] of [['hp'], ['hpBar'], ['armor'], ['ammo'], ['weapon'], ['timer'], ['score'], ['round'], ['hint'], ['cross'], ['hitmark'], ['killfeed'], ['scope'], ['money'], ['pips'], ['banner'], ['progress'], ['progBar'], ['progLabel'], ['board', 'scoreboard'], ['spec', 'spectate'], ['buy'], ['flash']]) el[k] = $(`hud-${s || k.toLowerCase()}`);
   const radar = $('hud-radar'), rctx = radar ? radar.getContext('2d') : null;
   const radarBg = document.createElement('canvas'); radarBg.width = radarBg.height = 140;
   let radarBounds = null, bgReady = false, lastBuyHtml = '';
@@ -27,18 +19,14 @@ export function createHud() {
   function drawRadar(state) {
     if (!rctx) return;
     if (!bgReady) {
-      let minX = 1e9, maxX = -1e9, minZ = 1e9, maxZ = -1e9;
-      for (const b of state.boxes) {
-        minX = Math.min(minX, b.min.x); maxX = Math.max(maxX, b.max.x);
-        minZ = Math.min(minZ, b.min.z); maxZ = Math.max(maxZ, b.max.z);
-      }
-      radarBounds = { minX, maxX, minZ, maxZ };
+      const B = state.map.bounds;
+      radarBounds = { minX: B.x0, maxX: B.x1, minZ: B.z0, maxZ: B.z1 };
       const b = radarBg.getContext('2d');
       b.fillStyle = 'rgba(10,12,14,0.72)'; b.fillRect(0, 0, 140, 140);
       b.fillStyle = 'rgba(232,226,214,0.35)';
       for (const box of state.boxes) {
-        b.fillRect((box.min.x - minX) / (maxX - minX) * 140, (box.min.z - minZ) / (maxZ - minZ) * 140,
-          Math.max(1, (box.max.x - box.min.x) / (maxX - minX) * 140), Math.max(1, (box.max.z - box.min.z) / (maxZ - minZ) * 140));
+        b.fillRect((box.min.x - B.x0) / (B.x1 - B.x0) * 140, (box.min.z - B.z0) / (B.z1 - B.z0) * 140,
+          Math.max(1, (box.max.x - box.min.x) / (B.x1 - B.x0) * 140), Math.max(1, (box.max.z - box.min.z) / (B.z1 - B.z0) * 140));
       }
       bgReady = true;
     }
@@ -61,13 +49,10 @@ export function createHud() {
         rctx.fillStyle = '#e8e2d6';
         rctx.beginPath(); rctx.moveTo(0, -6); rctx.lineTo(4, 5); rctx.lineTo(-4, 5); rctx.closePath(); rctx.fill();
         rctx.restore();
-        if (a.hasFuse) { rctx.strokeStyle = '#f0a03c'; rctx.beginPath(); rctx.arc(x, y, 7, 0, 7); rctx.stroke(); }
-      } else if (a.team === state.player.team) {
-        dot(x, y, 3, '#f0a03c');
-        if (a.hasFuse) { rctx.strokeStyle = '#f0a03c'; rctx.beginPath(); rctx.arc(x, y, 6, 0, 7); rctx.stroke(); }
-      } else if (state.time - state.spottedT[a.id] < 3) {
-        dot(x, y, 3, '#ff4444');
-      }
+      } else if (a.team === state.player.team) dot(x, y, 3, '#f0a03c');
+      else if (state.time - state.spottedT[a.id] < 3) dot(x, y, 3, '#ff4444');
+      else continue;
+      if (a.hasFuse) { rctx.strokeStyle = '#f0a03c'; rctx.beginPath(); rctx.arc(x, y, a === state.player ? 7 : 6, 0, 7); rctx.stroke(); }
     }
   }
   function buyHtml(state) {
@@ -75,8 +60,7 @@ export function createHud() {
     let rows = '';
     for (const [id, label, price, key] of BUY) {
       const owned = WEAPONS[id] ? p.weapons.includes(id)
-        : id === 'armor' ? p.armor >= 100 : id === 'helm' ? p.helm : id === 'cutters' ? p.hasCutters
-        : p.nades[id] >= GRENADES[id].max;
+        : ({ armor: p.armor >= 100, helm: p.helm, cutters: p.hasCutters })[id] ?? p.nades[id] >= GRENADES[id].max;
       const teamOk = id !== 'cutters' || p.team === 'bastion';
       const cls = !teamOk || p.money < price ? 'off' : owned ? 'owned' : '';
       rows += `<div class="buy-row ${cls}" data-id="${id}"><span class="buy-key">${key || '·'}</span><span>${label}</span><span>$${price}</span><span>${owned ? 'OWNED' : ''}</span></div>`;
@@ -88,6 +72,11 @@ export function createHud() {
     if (!node || last[key] === value) return;
     last[key] = value;
     node.textContent = value;
+  }
+  function tog(node, key, show) {
+    if (!node) return false;
+    if (last[key] !== show) { last[key] = show; node.style.display = show ? '' : 'none'; }
+    return show;
   }
   function setBar(node, key, pct) {
     if (!node || last[key] === pct) return;
@@ -120,42 +109,28 @@ export function createHud() {
       set(el.pips, 'pips', `●`.repeat(aS) + `○`.repeat(5 - aS) + '  ' + `●`.repeat(aB) + `○`.repeat(5 - aB));
       set(el.hint, 'hint', state.input.locked || state.autoplay ? '' : 'CLICK TO DEPLOY');
       set(el.spec, 'spec', v !== p ? `SPECTATING ${v.name} — SPACE FOR NEXT` : '');
-      if (el.banner) {
-        const show = state.banner && state.time - state.banner.t < 4;
-        if (last.bannerShow !== show) { last.bannerShow = show; el.banner.style.display = show ? '' : 'none'; }
-        if (show) set(el.banner, 'banner', state.banner.text);
-      }
-      if (el.progress) {
+      if (tog(el.banner, 'bannerShow', state.banner && state.time - state.banner.t < 4 && !state.buyOpen)) set(el.banner, 'banner', state.banner.text);
+      {
         const planting = p.plantT > 0, defusing = p.defuseT > 0;
-        const show = planting || defusing;
-        if (last.progShow !== show) { last.progShow = show; el.progress.style.display = show ? '' : 'none'; }
-        if (show) {
+        if (tog(el.progress, 'progShow', planting || defusing)) {
           const pct = planting ? p.plantT / ROUND.plantTime : p.defuseT / (p.hasCutters ? ROUND.defuseCuttersTime : ROUND.defuseTime);
           setBar(el.progBar, 'progbar', Math.round(pct * 100));
           set(el.progLabel, 'proglabel', planting ? 'PLANTING THE FUSE — HOLD E' : 'DEFUSING — HOLD E');
         }
       }
-      if (el.board) {
-        const show = state.input.scoreboard;
-        if (last.boardShow !== show) { last.boardShow = show; el.board.style.display = show ? '' : 'none'; }
-        if (show) {
-          let rows = '';
-          for (let i = 0; i < state.agents.length; i++) {
-            const a = state.agents[i];
-            rows += `<div class="${a.alive ? '' : 'dead'}"><span>${a.name}</span><span>${a.kills} / ${a.deaths} / ${a.headshots}</span><span>$${a.money}</span><span>${a.alive ? 'ALIVE' : 'DEAD'}</span></div>`;
-          }
-          const html = `<h3>SALTLINE — BRINEHOLD</h3>${rows}`;
-          if (html !== lastBoard) { lastBoard = html; el.board.innerHTML = html; }
+      if (tog(el.board, 'boardShow', state.input.scoreboard)) {
+        let rows = '';
+        for (let i = 0; i < state.agents.length; i++) {
+          const a = state.agents[i];
+          rows += `<div class="${a.alive ? '' : 'dead'}"><span>${a.name}</span><span>${a.kills} / ${a.deaths} / ${a.headshots}</span><span>$${a.money}</span><span>${a.alive ? 'ALIVE' : 'DEAD'}</span></div>`;
         }
+        const html = `<h3>SALTLINE — BRINEHOLD</h3>${rows}`;
+        if (html !== lastBoard) { lastBoard = html; el.board.innerHTML = html; }
       }
       drawRadar(state);
-      if (el.buy) {
-        const show = state.buyOpen;
-        if (last.buyShow !== show) { last.buyShow = show; el.buy.style.display = show ? '' : 'none'; }
-        if (show) {
-          const html = buyHtml(state);
-          if (html !== lastBuyHtml) { lastBuyHtml = html; el.buy.innerHTML = html; }
-        }
+      if (tog(el.buy, 'buyShow', state.buyOpen)) {
+        const html = buyHtml(state);
+        if (html !== lastBuyHtml) { lastBuyHtml = html; el.buy.innerHTML = html; }
       }
       if (el.flash) {
         const op = Math.round(Math.min(0.95, Math.max(0, p.flashT / 2.5)) * 20) / 20;
@@ -163,13 +138,9 @@ export function createHud() {
       }
       const spread = computeSpread(v);
       const gap = Math.round(4 + Math.tan(spread) * 360);
-      if (el.cross) {
-        const show = !v.scoped && v.alive;
-        if (last.crossShow !== show) { last.crossShow = show; el.cross.style.display = show ? '' : 'none'; }
-        if (show && last.gap !== gap) {
-          last.gap = gap;
-          el.cross.style.setProperty('--gap', `${gap}px`);
-        }
+      if (tog(el.cross, 'crossShow', !v.scoped && v.alive) && last.gap !== gap) {
+        last.gap = gap;
+        el.cross.style.setProperty('--gap', `${gap}px`);
       }
       if (el.scope) {
         const show = v.scoped;

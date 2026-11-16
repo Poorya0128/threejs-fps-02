@@ -39,12 +39,19 @@ export function createFx(scene) {
   const flashLight = new THREE.PointLight(0xffc27a, 0, 16, 1.8);
   scene.add(flashLight);
   let flashT = 0, flashDur = 0.06, flashMax = 22;
-  const smokeGeo = new THREE.SphereGeometry(1, 10, 8);
+  const smokeTex = (() => {
+    const c = document.createElement('canvas'); c.width = c.height = 64;
+    const x = c.getContext('2d');
+    const g = x.createRadialGradient(32, 32, 4, 32, 32, 32);
+    for (const [o, a] of [[0, 0.85], [0.55, 0.4], [1, 0]]) g.addColorStop(o, `rgba(255,255,255,${a})`);
+    x.fillStyle = g; x.fillRect(0, 0, 64, 64);
+    return new THREE.CanvasTexture(c);
+  })();
   const smokePuffs = [];
   for (let i = 0; i < 4; i++) {
     const group = [];
-    for (let j = 0; j < 5; j++) {
-      const m = new THREE.Mesh(smokeGeo, new THREE.MeshBasicMaterial({ color: 0x9aa0a3, transparent: true, opacity: 0.5, depthWrite: false }));
+    for (let j = 0; j < 9; j++) {
+      const m = new THREE.Sprite(new THREE.SpriteMaterial({ map: smokeTex, color: 0x9aa0a3, transparent: true, opacity: 0, depthWrite: false }));
       m.visible = false; scene.add(m);
       group.push(m);
     }
@@ -104,7 +111,7 @@ export function createFx(scene) {
         else if (e.kind === 4) spawnShell(e.x, e.y, e.z, e.dx, e.dz);
         else if (e.kind === 6 && chars) chars.flash(e.mat);
         else if (e.kind === 7) {
-          spawnSparks(e.x, e.y, e.z); spawnSparks(e.x, e.y, e.z); spawnSparks(e.x, e.y, e.z);
+          for (let k = 0; k < 3; k++) spawnSparks(e.x, e.y, e.z);
           flashLight.position.set(e.x, e.y, e.z); flashLight.intensity = 80; flashT = 0.3; flashDur = 0.3; flashMax = 80;
         }
       }
@@ -112,14 +119,18 @@ export function createFx(scene) {
       else flashLight.intensity = 0;
       for (let i = 0; i < 4; i++) {
         const s = state.smokes[i], group = smokePuffs[i];
-        const grow = s.active ? Math.min(1, (state.time - s.t) / 1) : 0;
-        for (let j = 0; j < 5; j++) {
+        const age = state.time - s.t;
+        const grow = s.active ? Math.min(1, age / 1.2) : 0;
+        const fade = s.active ? Math.max(0, Math.min(1, (s.dur - age) / 3)) : 0;
+        for (let j = 0; j < 9; j++) {
           const m = group[j];
           if (!s.active) { m.visible = false; continue; }
-          const a = j * 2.4;
-          m.position.set(s.x + Math.cos(a) * s.r * 0.45, s.y + (j % 2) * 0.6, s.z + Math.sin(a) * s.r * 0.45);
-          m.scale.setScalar(Math.max(0.01, s.r * 0.55 * grow));
-          m.material.opacity = 0.5 * grow;
+          const v = (k) => ((j * k) % 10) / 10;
+          const a = j * 2.399, rr = s.r * (0.15 + 0.38 * v(37));
+          m.position.set(s.x + Math.cos(a) * rr, s.y + 0.3 + v(53) * s.r * 0.55 + age * 0.12, s.z + Math.sin(a) * rr);
+          const sc = s.r * (0.5 + 0.22 * v(29)) * (0.6 + 0.4 * grow);
+          m.scale.set(sc, sc, 1);
+          m.material.opacity = 0.42 * grow * fade;
           m.visible = true;
         }
       }

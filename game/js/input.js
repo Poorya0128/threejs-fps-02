@@ -8,16 +8,15 @@ const KEYMAP = {
   Space: 'jump', ShiftLeft: 'walk', ShiftRight: 'walk',
   KeyC: 'crouch', ControlLeft: 'crouch',
 };
+const ACT = { KeyR: 'reload', KeyQ: 'lastWeapon', KeyB: 'buyToggle' };
 
 export function createInput(canvas, input) {
   let justLocked = false;
   const onKey = (e, down) => {
     const k = KEYMAP[e.code];
     if (k) { input[k] = down; if (k === 'jump' || k === 'crouch') e.preventDefault(); }
-    if (e.code === 'KeyR' && down) input.reload = true;
-    if (e.code === 'KeyQ' && down) input.lastWeapon = true;
+    if (ACT[e.code] && down) input[ACT[e.code]] = true;
     if (e.code === 'KeyE') input.interact = down;
-    if (e.code === 'KeyB' && down) input.buyToggle = true;
     if (e.code === 'Tab') { input.scoreboard = down; e.preventDefault(); }
     if (e.code.startsWith('Digit')) {
       const s = Number(e.code[5]);
