@@ -1,6 +1,6 @@
-// SALTLINE grenades.js — thrown utility (PLAN.md §8): ballistic arcs that bounce off the map, Shard frag (damage
-// falls off over 6 m and needs line of sight), Veil smoke (a sphere that blocks sight for bots and players) and
-// Glare flash (blinds by distance and view angle). Pools of 8 grenades and 4 smokes live in the state.
+// SALTLINE grenades.js — thrown utility (PLAN.md §8): ballistic arcs that bounce off the map, Shard frag (falls off
+// over 6 m, needs line of sight), Veil smoke (a sphere that blocks sight for bots and players) and Glare flash
+// (blinds by distance and view angle). Pools of 8 grenades and 4 smokes live in the state.
 import { Vector3 } from 'three';
 import { GRENADES, THROW } from './config.js';
 import { losBlocked } from './math.js';
@@ -17,7 +17,7 @@ function inside(boxes, x, y, z) {
 	return false;
 }
 
-// Player throws along the view (LMB full, RMB lob); bots pass a target and get the arc that lands on it.
+// The player throws along the view (LMB full, RMB lob); bots pass a target and get the arc that lands on it.
 export function throwGrenade(state, a, lob, tx, ty, tz) {
 	const kind = a.nadeSel, g = state.nades.find((n) => !n.active);
 	if (!a.nades[kind] || state.time < a.nextFireT || !g) return false;
@@ -32,10 +32,10 @@ export function throwGrenade(state, a, lob, tx, ty, tz) {
 	return true;
 }
 
-function explode(state, g) {
+function shard(state, g) {
 	const gd = GRENADES.shard;
 	state.fxBoom++;
-	pushFx(state, 7, g.x, g.y, g.z, 0,0,0,0);
+	pushFx(state, 7, g.x, g.y, g.z, 0, 0, 0, 0);
 	for (const t of state.agents) {
 		if (!t.alive || t.team === g.owner.team) continue;
 		const dist = Math.hypot(t.pos.x - g.x, t.pos.y + 1 - g.y, t.pos.z - g.z);
@@ -45,14 +45,13 @@ function explode(state, g) {
 }
 function glare(state, g) {
 	const gd = GRENADES.glare;
-	pushFx(state, 7, g.x, g.y, g.z, 0,0,0,1);
+	pushFx(state, 7, g.x, g.y, g.z, 0, 0, 0, 1);
 	for (const a of state.agents) {
 		if (!a.alive) continue;
 		const ey = a.pos.y + a.eyeHeight, dx = g.x - a.pos.x, dz = g.z - a.pos.z, dist = Math.hypot(dx, g.y - ey, dz);
 		if (dist > gd.range || losBlocked(state.boxes, g.x, g.y, g.z, a.pos.x, ey, a.pos.z)) continue;
-		const facing = (-Math.sin(a.yaw) * dx - Math.cos(a.yaw) * dz) / Math.max(.01, dist) > .2;
-		const blind = gd.blind * (1 - dist / gd.range) * (facing ? 1 : .25);
-		if (blind > .3) { a.flashT = Math.max(a.flashT, blind); if (a === state.player) state.fxRing++; }
+		const facing = (-Math.sin(a.yaw) * dx - Math.cos(a.yaw) * dz) / Math.max(.01, dist) > .2, blind = gd.blind * (1 - dist / gd.range) * (facing ? 1 : .25);
+		if (blind > .3) a.flashT = Math.max(a.flashT, blind);
 	}
 }
 
@@ -63,7 +62,7 @@ export function updateGrenades(state, dt) {
 		const ox = g.x, oy = g.y, oz = g.z;
 		g.vy -= THROW.gravity * dt; g.x += g.vx * dt; g.y += g.vy * dt; g.z += g.vz * dt;
 		if (g.y < .05) { g.y = .05; g.vy = Math.abs(g.vy) * THROW.bounce; g.vx *= .7; g.vz *= .7; }
-		else if (inside(state.boxes, g.x, g.y, g.z)) { // find which axis entered the box and reflect that velocity
+		else if (inside(state.boxes, g.x, g.y, g.z)) { // find the axis that entered the box and reflect it
 			const vert = !inside(state.boxes, g.x, oy, g.z), alongX = !vert && inside(state.boxes, g.x, oy, oz);
 			g.x = ox; g.y = oy; g.z = oz;
 			if (vert) { g.vy = -g.vy * THROW.bounce; g.vx *= .7; g.vz *= .7; } else if (alongX) { g.vx = -g.vx * THROW.bounce; g.vy *= .8; } else { g.vz = -g.vz * THROW.bounce; g.vy *= .8; }
@@ -72,9 +71,9 @@ export function updateGrenades(state, dt) {
 		g.fuseT -= dt;
 		if (g.kind === 'veil' && (Math.hypot(g.vx, g.vy, g.vz) < .8 || g.fuseT <= 0)) {
 			g.active = false;
-			const s = state.smokes.find((m) => !m.active);
-			if (s) Object.assign(s, { active: true, x: g.x, y: Math.max(.9, g.y), z: g.z, r: GRENADES.veil.radius, t: state.time, dur: GRENADES.veil.dur });
-		} else if (g.fuseT <= 0) { g.active = false; if (g.kind === 'shard') explode(state, g); else glare(state, g); }
+			const s = state.smokes.find((m) => !m.active), v = GRENADES.veil;
+			if (s) Object.assign(s, { active: true, x: g.x, y: Math.max(.9, g.y), z: g.z, r: v.radius, t: state.time, dur: v.dur });
+		} else if (g.fuseT <= 0) { g.active = false; (g.kind === 'shard' ? shard : glare)(state, g); }
 	}
 	for (const s of state.smokes) if (s.active && state.time > s.t + s.dur) s.active = false;
 }

@@ -1,13 +1,11 @@
-// SALTLINE art/weapons-art.js — original firearm designs built from parts (ART.md §9): bevelled boxes, extruded
-// side profiles with lightening slots, lathed barrels, rails and optics. Origin = trigger, forward = -z, units = m.
-// Vertex colour = finish, aE = 1 polymer / 2 metal for the shared material (pattern 12). The slide and the
-// magazine are separate meshes so the viewmodel can animate them.
+// SALTLINE art/weapons-art.js — original firearm designs built from parts (ART.md §9): bevelled boxes, extruded side
+// profiles with lightening slots, lathed barrels, rails and optics. Origin = trigger, forward = -z, metres. Vertex colour
+// is the finish, aE 1 polymer / 2 metal; slide and magazine stay separate meshes so the viewmodel can animate them.
 import { Shape, Path, ExtrudeGeometry, LatheGeometry, Vector2, Matrix4, Mesh, Group, Object3D, Color, MeshBasicMaterial, AdditiveBlending,
-	PlaneGeometry, CircleGeometry, CanvasTexture, MeshStandardMaterial, DoubleSide } from 'three';
-import { Bld, boxInto } from './mesh.js';
+	PlaneGeometry, CircleGeometry, MeshStandardMaterial, DoubleSide } from 'three';
+import { Bld, boxInto, lin, canvasTex } from './mesh.js';
 import { procMaterial } from './materials.js';
 
-const lin = (hex) => { const c = new Color(hex); return [c.r, c.g, c.b]; };
 const FIN = { K: lin(0x1b1c1f), M: lin(0x8a8e93), P: lin(0x45464a), S: lin(0xc4c7ca), W: lin(0x8a6040), B: lin(0xc9a050), R: lin(0x5a5d61) };
 export const weaponMaterial = procMaterial({ c: 0xffffff, pat: 12, bump: .004, env: 1.2, metal: 1 });
 const _m = new Matrix4();
@@ -46,9 +44,9 @@ function optic(B, kind, z, y) {
 	return y + .03;
 }
 
-// Where hands go: pistol grip front and back edges as [z, y, z, y] (top, bottom), half widths of grip and frame, the height under the frame
-// for the web of the hand, the first finger height and the trigger (y, z). Long guns add the handguard section
-// hg = [centre y, half width, half height, superellipse power] for the support hand.
+// Where hands go: grip front and back edges [z, y, z, y] (top, bottom), half widths of grip and frame, the height of the
+// web of the hand, the first finger height, the trigger (y, z). Long guns add the handguard section hg = [centre y,
+// half width, half height, superellipse power] for the support hand.
 const PGRIP = { f: [-.016,-.03,-.005,-.12], b: [.012,-.01,.03,-.115], hw: .017, side: .014, top: -.014, fy: -.052, trig: [-.027,-.033] };
 const LGRIP = { f: [.008,-.03,.024,-.124], b: [.035,-.02,.058,-.118], hw: .016, side: .0155, top: -.026, fy: -.062, trig: [-.032,-.017] };
 function pistol(o) {
@@ -93,7 +91,7 @@ function longGun(o) {
 	lat(B, FIN.M, 0, by, bz - o.barrel + .01, [.013,0,.013,.012,.011,.014,.011,.02,.013,.022,.013,.05,.009,.055,0,.055], 2,16);
 	box(B, FIN.M, -.012, by - .014, bz, .012, by + .016, bz - .025);
 	if (o.fore) ext(B, FIN.P, .026, [h0 + .07, hy0, h0 + .11, hy0, h0 + .105, hy0 - .09, h0 + .075, hy0 - .09], 0, [], 1);
-	const sz0 = z0 - .005, stock = o.fp ? 'none' : o.stock; // in first person the stock sits behind the camera
+	const sz0 = z0 - .005, stock = o.fp ? 'none' : o.stock; // in first person the stock would sit behind the camera
 	if (stock === 'tube') { lat(B, FIN.P, 0,.038, sz0 + .17, [.0135,0,.0135,.17], 1); ext(B, FIN.P, .034, [-sz0 - .1,.064, -sz0 - .26,.068, -sz0 - .27,-.045, -sz0 - .235,-.052, -sz0 - .13,.008, -sz0 - .1,.012], 0, [[-sz0 - .15,.045, -sz0 - .235,.048, -sz0 - .235,0, -sz0 - .165,.025]]); }
 	else if (stock === 'chassis') ext(B, acc, .03, [-sz0,.06, -sz0 - .3,.07, -sz0 - .31,-.06, -sz0 - .27,-.065, -sz0 - .2,-.02, -sz0,-.025], 0, [[-sz0 - .04,.035, -sz0 - .15,.04, -sz0 - .15,0, -sz0 - .04,0], [-sz0 - .18,.04, -sz0 - .27,.045, -sz0 - .27,-.03, -sz0 - .2,0]], 1);
 	else if (stock === 'wire') { for (const s of [-1,1]) lat(B, FIN.M, s * .014,.03, sz0 + .22, [.004,0,.004,.22], 2,8); box(B, FIN.P, -.02,-.01, sz0 + .22,.02,.06, sz0 + .235,1); }
@@ -124,23 +122,20 @@ const SPECS = {
 	cutlass: knife,
 };
 
-const reticle = (() => {
-	const c = document.createElement('canvas'); c.width = c.height = 64;
-	const x = c.getContext('2d'), g = x.createRadialGradient(32,32,0,32,32,8);
-	g.addColorStop(0, 'rgba(255,90,60,1)'); g.addColorStop(.4, 'rgba(255,60,40,.9)'); g.addColorStop(1, 'rgba(255,40,20,0)');
-	x.fillStyle = g; x.fillRect(0,0,64,64);
-	return new MeshBasicMaterial({ map: new CanvasTexture(c), transparent: true, blending: AdditiveBlending, depthWrite: false, color: new Color(4,1.4,1.2) });
-})();
+const reticle = new MeshBasicMaterial({ transparent: true, blending: AdditiveBlending, depthWrite: false, color: new Color(4, 1.4, 1.2), map: canvasTex(64, (x) => {
+	const g = x.createRadialGradient(32, 32, 0, 32, 32, 8);
+	g.addColorStop(0, '#ff5a3c'); g.addColorStop(.4, 'rgba(255,60,40,.9)'); g.addColorStop(1, 'rgba(255,40,20,0)'); x.fillStyle = g; x.fillRect(0, 0, 64, 64);
+}) });
 const lens = new MeshStandardMaterial({ color: 0x241f3c, metalness: .5, roughness: .05, transparent: true, opacity: .6, envMapIntensity: 2.5, side: DoubleSide });
 
-// lod = true: one merged mesh (third person). Otherwise slide and magazine stay separate and optics get a reticle.
+// lod: one merged, shadow-casting mesh (third person). Otherwise slide and magazine stay separate and optics get glass.
 export function buildWeapon(id, lod = false) {
 	const s = (SPECS[id] || SPECS.wren)(!lod), g = new Group();
 	if (lod) { for (const P of [s.K, s.A]) if (P) s.B.merge(P); s.K = s.A = null; }
 	const mk = (P) => { if (!P || !P.p.length) return null; const m = new Mesh(P.geo(), weaponMaterial); m.castShadow = lod; g.add(m); return m; };
 	mk(s.B);
 	const slide = mk(s.K), mag = mk(s.A);
-	if (!lod && s.optic) { // tinted glass at both ends of the optic and an HDR red dot that reads on sky and walls
+	if (!lod && s.optic) { // tinted glass at both ends and an HDR red dot that reads on sky and walls
 		const sc = s.optic === 'scope', z0 = s.oz + (sc ? .139 : -.001), z1 = z0 - (sc ? .308 : s.optic === 'holo' ? .088 : .048), R = sc ? .024 : .02;
 		for (const z of [z0, z1]) { const l = new Mesh(new CircleGeometry(R, 20), lens); l.position.set(0, s.sight, z); g.add(l); }
 		if (s.optic !== 'scope') { const r = new Mesh(new PlaneGeometry(.03,.03), reticle); r.position.set(0, s.sight, (z0 + z1) / 2); r.renderOrder = 2; g.add(r); }

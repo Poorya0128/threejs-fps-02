@@ -1,5 +1,5 @@
-// SALTLINE render.js — renderer, world and viewmodel cameras, interpolated camera placement, resize and pass order:
-// world → HDR target, depth cleared, viewmodel on top, then post (bloom + grade) to the screen.
+// SALTLINE render.js — renderer, world and viewmodel cameras, interpolated camera placement and the pass order:
+// world → HDR target, depth cleared, viewmodel on top, then post (bloom and grade) to the screen.
 import { WebGLRenderer, Scene, PerspectiveCamera, SRGBColorSpace, NoToneMapping, PCFShadowMap } from 'three';
 import { WEAPONS } from './config.js';
 import { createPost } from './art/post.js';
@@ -9,13 +9,11 @@ export function createRenderer(holder) {
 	renderer.setPixelRatio(Math.min(devicePixelRatio, 1.5));
 	renderer.setSize(innerWidth, innerHeight);
 	Object.assign(renderer, { outputColorSpace: SRGBColorSpace, toneMapping: NoToneMapping, autoClear: false });
-	renderer.shadowMap.enabled = true; renderer.shadowMap.type = PCFShadowMap;
-	renderer.info.autoReset = false;
+	renderer.shadowMap.enabled = true; renderer.shadowMap.type = PCFShadowMap; renderer.info.autoReset = false;
 	holder.appendChild(renderer.domElement);
-	const scene = new Scene(), vmScene = new Scene();
-	const camera = new PerspectiveCamera(80, innerWidth / innerHeight, .05,900), vmCamera = new PerspectiveCamera(54, innerWidth / innerHeight, .01,5);
+	const scene = new Scene(), vmScene = new Scene(), post = createPost(renderer);
+	const camera = new PerspectiveCamera(80, innerWidth / innerHeight, .05, 900), vmCamera = new PerspectiveCamera(54, innerWidth / innerHeight, .01, 5);
 	camera.rotation.order = 'YXZ';
-	const post = createPost(renderer);
 	addEventListener('resize', () => {
 		for (const c of [camera, vmCamera]) { c.aspect = innerWidth / innerHeight; c.updateProjectionMatrix(); }
 		renderer.setSize(innerWidth, innerHeight); post.resize(innerWidth * renderer.getPixelRatio(), innerHeight * renderer.getPixelRatio());
@@ -23,17 +21,16 @@ export function createRenderer(holder) {
 	const setFov = (f) => { if (camera.fov !== f) { camera.fov = f; camera.updateProjectionMatrix(); } };
 	return {
 		renderer, scene, camera, vmScene, vmCamera,
-		// Eye position interpolated between the last two ticks; the camera shows half of the recoil (view punch).
+		// Eye interpolated between the last two ticks; the camera shows half of the recoil (view punch).
 		placeCamera(a, alpha, fov) {
 			camera.position.lerpVectors(a.prevPos, a.pos, alpha).y += a.eyeHeight;
-			camera.rotation.set(a.pitch + a.recoil.pitch * .5, a.yaw + a.recoil.yaw * .5,0);
-			const w = WEAPONS[a.weapons[a.active]];
-			setFov(a.scoped && w && w.zoomFov ? w.zoomFov[a.scopeLevel - 1] : fov);
+			camera.rotation.set(a.pitch + a.recoil.pitch * .5, a.yaw + a.recoil.yaw * .5, 0);
+			const zoom = WEAPONS[a.weapons[a.active]]?.zoomFov;
+			setFov(a.scoped && zoom ? zoom[a.scopeLevel - 1] : fov);
 		},
-		orbit(t) {
-			const r = 34, ang = t * .04 + 2.2;
-			camera.position.set(Math.cos(ang) * r, 15,-12 + Math.sin(ang) * r * .7);
-			camera.lookAt(0,1,-10); setFov(62);
+		orbit(t) { // title screen: a slow circle over the map
+			const ang = t * .04 + 2.2;
+			camera.position.set(Math.cos(ang) * 34, 15, Math.sin(ang) * 24 - 12); camera.lookAt(0, 1, -10); setFov(62);
 		},
 		renderFrame(time) {
 			renderer.info.reset();
