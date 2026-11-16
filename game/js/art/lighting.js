@@ -1,11 +1,7 @@
 // SALTLINE art/lighting.js — sun, sky fill, image-based light (ART.md §3).
-// PMREM environment lifts shadowed faces to blue-grey, never black
-// (the M0 failure: hemisphere 0.35 was the only fill).
 import * as THREE from 'three';
 import { RENDER, PALETTE } from '../config.js';
 
-// Small sky dome: gradient zenith -> horizon + sun disc glow. Used both as
-// the visible sky and as the PMREM environment source.
 export function buildSkyMaterial(sunDir) {
   return new THREE.ShaderMaterial({
     side: THREE.BackSide, depthWrite: false, fog: false,
@@ -42,7 +38,6 @@ export function buildLighting(renderer, scene, map) {
   sun.target.position.set(0, 0, 0);
   sun.castShadow = true;
   sun.shadow.mapSize.set(RENDER.shadowSize, RENDER.shadowSize);
-  // Orthographic shadow camera fitted to the playable bounds in light space.
   const sc = sun.shadow.camera;
   sc.left = -75; sc.right = 75; sc.top = 75; sc.bottom = -75;
   sc.near = 10; sc.far = 220;
@@ -54,7 +49,6 @@ export function buildLighting(renderer, scene, map) {
   const hemi = new THREE.HemisphereLight(RENDER.hemiSky, RENDER.hemiGround, RENDER.hemiIntensity);
   scene.add(hemi);
 
-  // Sky dome (visible) + PMREM environment (reflections + shadow lift).
   const skyMat = buildSkyMaterial(dir);
   const sky = new THREE.Mesh(new THREE.SphereGeometry(400, 24, 16), skyMat);
   scene.add(sky);
@@ -66,8 +60,6 @@ export function buildLighting(renderer, scene, map) {
   scene.environmentIntensity = RENDER.envIntensity;
   pmrem.dispose();
 
-  // Interior sodium lights (no shadows) + one visible fixture each (M5 adds
-  // the fixture meshes; the light itself is the M1 deliverable).
   const points = [];
   for (const [x, y, z] of map.lights) {
     if (points.length >= RENDER.maxPointLights) break;
@@ -75,17 +67,12 @@ export function buildLighting(renderer, scene, map) {
     p.position.set(x, y, z);
     scene.add(p); points.push(p);
   }
-  // Fake bounce: dim warm lights where sun hits light floors, to lift the
-  // walls next to them. Strong enough that shadowed ground reads blue-grey
-  // with detail, never black.
   const bounce = [];
   for (const [x, z] of [[-28, -8], [0, 18], [-38, 26]]) {
     const p = new THREE.PointLight(0xffd9a8, 12, 18, 2);
     p.position.set(x, 2.5, z);
     scene.add(p); bounce.push(p);
   }
-  // Muzzle-flash light, pooled: always in the scene, intensity 0 when off
-  // (adding/removing lights recompiles shaders).
   const flash = new THREE.PointLight(0xffc06a, 0, 12, 2);
   scene.add(flash);
 

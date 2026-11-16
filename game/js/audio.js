@@ -1,8 +1,6 @@
 // SALTLINE audio.js — WebAudio synth, no files (§12b). Buffers are
-// generated once at boot; shots differ per weapon class. update(state)
-// polls sim state each frame and plays what changed.
 let ctx = null, master = null, noiseBuf = null;
-const seen = { shots: 0, reload: 0, dry: 0, hitT: -1 };
+const seen = { shots: 0, reload: 0, dry: 0, hitT: -1, boom: 0, ring: 0, bounce: [false, false, false, false, false, false, false, false] };
 
 function ensure() {
   if (ctx) return true;
@@ -38,7 +36,6 @@ function thump(t0, freq, dur, gain) {
   o.start(t0); o.stop(t0 + dur + 0.02);
 }
 
-// Shot per weapon class: noise crack + low thump + filtered tail.
 function shot(cls) {
   if (!ensure()) return;
   if (ctx.state === 'suspended') ctx.resume();
@@ -47,7 +44,7 @@ function shot(cls) {
   else if (cls === 'smg') { burst(t, 0.07, 4200, 0.4); thump(t, 200, 0.07, 0.3); }
   else if (cls === 'shotgun') { burst(t, 0.22, 1800, 0.7); thump(t, 120, 0.2, 0.6); }
   else if (cls === 'marksman') { burst(t, 0.25, 2400, 0.8); thump(t, 110, 0.25, 0.65); }
-  else { burst(t, 0.11, 2800, 0.55); thump(t, 150, 0.11, 0.4); } // rifle
+  else { burst(t, 0.11, 2800, 0.55); thump(t, 150, 0.11, 0.4); }
 }
 
 function click(t0, freq, gain) {
@@ -61,7 +58,6 @@ function click(t0, freq, gain) {
 
 export function createAudio() {
   return {
-    // Called every frame; plays sounds for sim changes since last frame.
     update(state) {
       const p = state.player;
       if (state.shots.fired > seen.shots) {
@@ -69,13 +65,26 @@ export function createAudio() {
         shot({ wren: 'pistol', mako: 'pistol', hornet: 'smg', breaker: 'shotgun', talon: 'rifle', gavel: 'rifle', longbow: 'marksman', cutlass: 'knife' }[id] || 'rifle');
       }
       seen.shots = state.shots.fired;
-      if (p.reloadT > 0 && seen.reload === 0) { // reload started
+      if (p.reloadT > 0 && seen.reload === 0) {
         if (ensure()) { const t = ctx.currentTime; click(t, 1400, 0.2); click(t + 0.15, 900, 0.2); }
       }
       seen.reload = p.reloadT > 0 || p.reloadShell > 0 ? 1 : 0;
       if (p.dryT && p.dryT !== seen.dry) {
         seen.dry = p.dryT;
         if (ensure()) click(ctx.currentTime, 2200, 0.25);
+      }
+      if (state.fxBoom > seen.boom) {
+        seen.boom = state.fxBoom;
+        if (ensure()) { const t = ctx.currentTime; burst(t, 0.7, 900, 0.9); thump(t, 90, 0.6, 0.8); }
+      }
+      if (state.fxRing > seen.ring) {
+        seen.ring = state.fxRing;
+        if (ensure()) click(ctx.currentTime, 3200, 0.3);
+      }
+      for (let i = 0; i < 8; i++) {
+        const g = state.nades[i];
+        if (g.bounced && !seen.bounce[i]) { seen.bounce[i] = true; if (ensure()) click(ctx.currentTime, 800, 0.15); }
+        else if (!g.active) seen.bounce[i] = false;
       }
       if (p.lastHit && p.lastHit.t !== seen.hitT) {
         seen.hitT = p.lastHit.t;
@@ -89,7 +98,6 @@ export function createAudio() {
         }
       }
     },
-    // Pause-menu volume slider (M3): master gain, 0–1.
     setVolume(v) { if (master) master.gain.value = v; },
   };
 }

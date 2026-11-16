@@ -1,10 +1,9 @@
 // SALTLINE weapons.js — gunplay (PLAN.md §7). Player and bots share this
-// code path: fire, computeSpread, applyRecoil, reload, switch, traceShot,
-// applyHit. Sounds and visuals are driven by state (fxEvents, lastHit).
 import * as THREE from 'three';
 import { WEAPONS, HIT, ARMOR_RATIO, MOVE, ECON } from './config.js';
 import { clamp, rayAABB, raySphere, rayCapsule, _v0, _v1, _v3 } from './math.js';
-import { pushFx } from './state.js';
+import { pushFx, pushNoise } from './state.js';
+import { throwGrenade } from './grenades.js';
 
 const _eye = new THREE.Vector3();
 const _muz = new THREE.Vector3();
@@ -13,8 +12,14 @@ const _right = new THREE.Vector3();
 const _up = new THREE.Vector3();
 
 export function giveWeapon(a, id) {
-  a.weapons.push(id);
-  a.ammo[id] = { mag: WEAPONS[id].mag, reserve: WEAPONS[id].reserve };
+  const w = WEAPONS[id];
+  const grp = (x) => (x.cls === 'pistol' ? 1 : x.cls === 'knife' ? 2 : 0);
+  let idx = -1;
+  for (let i = 0; i < a.weapons.length; i++) if (grp(WEAPONS[a.weapons[i]]) === grp(w)) { idx = i; break; }
+  if (idx < 0) { idx = a.weapons.length; a.weapons.push(id); }
+  else a.weapons[idx] = id;
+  a.ammo[id] = { mag: w.mag, reserve: w.reserve };
+  return idx;
 }
 
 export function activeWeapon(a) { return WEAPONS[a.weapons[a.active]]; }
@@ -24,7 +29,6 @@ export function eyePos(a, out) {
   return out.set(a.pos.x, a.pos.y + a.eyeHeight, a.pos.z);
 }
 
-// View direction including accumulated aim punch (full recoil).
 export function viewDir(a, out) {
   const yaw = a.yaw + a.recoil.yaw, pitch = a.pitch + a.recoil.pitch;
   const cp = Math.cos(pitch);
@@ -38,8 +42,6 @@ function maxSpeed(a) {
   return s;
 }
 
-// Spread in radians, recomputed every tick (§7): base (crouch/scope)
-// + move + air + bloom. Stopping to aim pays.
 export function computeSpread(a) {
   const w = activeWeapon(a);
   if (w.cls === 'knife') return 0;
@@ -63,8 +65,6 @@ export function applyRecoil(state, a, w) {
   a.lastShotT = state.time;
 }
 
-// Hitboxes rebuilt from pos/crouch/yaw at trace time (PLAN.md §7):
-// head sphere, chest/stomach capsules, arm and leg capsules.
 function traceAgent(ox, oy, oz, dx, dy, dz, t, maxDist) {
   const eyeY = t.pos.y + t.eyeHeight;
   const fx = -Math.sin(t.yaw), fz = -Math.cos(t.yaw);
@@ -83,7 +83,6 @@ function traceAgent(ox, oy, oz, dx, dy, dz, t, maxDist) {
   return best < 0 ? null : { t: best, target: t, group };
 }
 
-// Surface normal of the AABB face nearest the hit point.
 function boxNormal(b, p) {
   const dxl = p.x - b.min.x, dxr = b.max.x - p.x;
   const dyl = p.y - b.min.y, dyr = b.max.y - p.y;
@@ -97,8 +96,6 @@ function boxNormal(b, p) {
   return _v3.set(0, 0, 1);
 }
 
-// Hitscan: nearest world AABB vs nearest agent hitbox. Closest hit wins.
-// Returns {t, point, normal, mat, target, group} or null.
 export function traceShot(state, shooter, ox, oy, oz, dx, dy, dz, maxDist) {
   let tw = -1, wb = null;
   for (let i = 0; i < state.boxes.length; i++) {
@@ -122,7 +119,6 @@ export function traceShot(state, shooter, ox, oy, oz, dx, dy, dz, maxDist) {
   return null;
 }
 
-// Damage with hitgroup multiplier, range falloff and armor (PLAN.md §4.5/§7).
 export function applyHit(state, shooter, target, group, dmg, dist, w) {
   let total = dmg * Math.pow(w.falloff, dist / 25);
   total *= group === 'head' ? (target.helm ? HIT.headHelm : HIT.head) : HIT[group];
@@ -133,13 +129,13 @@ export function applyHit(state, shooter, target, group, dmg, dist, w) {
     target.hp -= total - toArmor;
   } else target.hp -= total;
   state.shots.hits++;
-  if (group === 'head') state.shots.heads++;
-  pushFx(state, 6, target.pos.x, target.pos.y + 1, target.pos.z, 0, 0, 0, target.id, false); // hit flash
+  if (group === 'head') { state.shots.heads++; shooter.headshots++; }
+  state.spottedT[target.id] = state.time;
+  pushFx(state, 6, target.pos.x, target.pos.y + 1, target.pos.z, 0, 0, 0, target.id, false);
   const killed = target.hp <= 0;
   if (killed) {
     target.hp = 0; target.alive = false; target.deaths++;
     shooter.kills++; state.shots.kills++;
-    // Kill reward by weapon class (PLAN.md §4.4).
     shooter.money = Math.min(ECON.cap, shooter.money + (ECON.kill[w.cls] || 0));
     state.killfeed.push({ text: `${shooter.name} ▸ ${target.name} · ${w.name}`, head: group === 'head', t: state.time });
     if (state.killfeed.length > 5) state.killfeed.shift();
@@ -178,9 +174,6 @@ export function switchWeapon(state, a, idx) {
   a.shotsFired = 0; a.recoil.pitch = 0; a.recoil.yaw = 0; a.spreadBloom = 0;
 }
 
-// One shot. The trace starts at the EYE (the crosshair is the aim point);
- // the tracer starts at the muzzle. Tracing from the muzzle biased shots
-// ~0.16 m low / 0.18 m right — enough to turn a headshot into a chest hit.
 function firePellet(state, a, w, ex, ey, ez, mx, my, mz, spread, every3rd) {
   viewDir(a, _dir);
   if (spread > 0) {
@@ -206,7 +199,7 @@ function fireKnife(state, a) {
     const dx = t.pos.x - cx, dy = (t.pos.y + 1.0) - cy, dz = t.pos.z - cz;
     if (dx * dx + dy * dy + dz * dz > 1.1) continue;
     const tf = -Math.sin(t.yaw) * (a.pos.x - t.pos.x) + -Math.cos(t.yaw) * (a.pos.z - t.pos.z);
-    const back = tf < -0.5; // target faces away from the attacker
+    const back = tf < -0.5;
     const w = activeWeapon(a);
     applyHit(state, a, t, 'chest', back ? w.backstab : w.dmg, 1, w);
     a.nextFireT = state.time + 0.6;
@@ -215,8 +208,6 @@ function fireKnife(state, a) {
   a.nextFireT = state.time + 0.6;
 }
 
-// Shared fire path: player via updateWeapons, bots directly
-// with (held, edge) = (wantFire, wantFire).
 export function tryFire(state, a, held, edge) {
   const w = activeWeapon(a);
   if (w.cls === 'knife') {
@@ -226,10 +217,10 @@ export function tryFire(state, a, held, edge) {
   if (a.switchT > 0 || state.time < a.nextFireT) return;
   if (!w.auto && !edge) return;
   if (w.auto && !held) return;
-  if (a.reloadShell > 0) a.reloadShell = 0; // shotgun reload interrupted by firing
+  if (a.reloadShell > 0) a.reloadShell = 0;
   const am = a.ammo[activeId(a)];
   if (am.mag <= 0) {
-    a.dryT = state.time; // audio polls this for the dry-fire click
+    a.dryT = state.time;
     a.nextFireT = state.time + 0.3;
     startReload(state, a);
     return;
@@ -245,11 +236,9 @@ export function tryFire(state, a, held, edge) {
   const spread = computeSpread(a);
   const n = w.pellets;
   for (let i = 0; i < n; i++) firePellet(state, a, w, _eye.x, _eye.y, _eye.z, _muz.x, _muz.y, _muz.z, spread, state.shots.fired % 3 === 0 && i === 0);
-  if (state.noise.length > 16) state.noise.shift();
-  state.noise.push({ x: a.pos.x, y: a.pos.y, z: a.pos.z, r: w.noise, t: state.time });
+  pushNoise(state, a.pos.x, a.pos.y, a.pos.z, w.noise, a.team);
 }
 
-// Per-tick weapon system for every agent (player input + reload/recoil).
 export function updateWeapons(state, dt) {
   const p = state.player, inp = state.input;
   for (const a of state.agents) {
@@ -266,7 +255,6 @@ export function updateWeapons(state, dt) {
       }
     }
     if (a.switchT > 0) a.switchT -= dt;
-    // Recoil + bloom recover; pattern resets once fully recovered.
     const dtLast = state.time - (a.lastShotT || -99);
     if (dtLast > 0.1) {
       const k = Math.exp(-4 * dt);
@@ -275,25 +263,27 @@ export function updateWeapons(state, dt) {
     }
     a.spreadBloom *= Math.exp(-6 * dt);
   }
-  // Weapon switching is attempted first (switchWeapon no-ops while
-  // switchT > 0). The RMB scope toggle runs regardless of switchT: it is a
-  // single-press edge, and dropping it when the press lands inside the
-  // 0.35 s switch window made the scope silently miss. Fire/reload stay
-  // blocked until the switch finishes.
-  if (inp.slot > 0) { switchWeapon(state, p, inp.slot - 1); }
-  else if (inp.lastWeapon) switchWeapon(state, p, p.lastWeapon);
+  if (inp.slot === 4) {
+    const kinds = ['shard', 'veil', 'glare'].filter((k) => p.nades[k] > 0);
+    if (kinds.length) { p.nadeSel = kinds[(kinds.indexOf(p.nadeSel) + 1) % kinds.length]; p.grenadeMode = true; }
+  } else if (inp.slot > 0) { switchWeapon(state, p, inp.slot - 1); p.grenadeMode = false; }
+  else if (inp.lastWeapon) { switchWeapon(state, p, p.lastWeapon); p.grenadeMode = false; }
   else if (inp.wheel !== 0) {
     const d = inp.wheel > 0 ? 1 : -1;
     switchWeapon(state, p, (p.active + d + p.weapons.length) % p.weapons.length);
+    p.grenadeMode = false;
   }
-  // RMB cycles the Longbow scope (0 → 1 → 2 → 0); other weapons ignore it.
-  if (inp.alt && !p.prevAlt) {
+  const altEdge = inp.alt && !p.prevAlt;
+  if (altEdge && !p.grenadeMode) {
     const w = activeWeapon(p);
     if (w.scope) { p.scopeLevel = (p.scopeLevel + 1) % 3; p.scoped = p.scopeLevel > 0; }
   }
   p.prevAlt = inp.alt;
   if (!p.alive || p.switchT > 0 || state.phase === 'buy' || state.phase === 'post' || state.phase === 'matchEnd') { inp.reload = false; inp.slot = 0; inp.lastWeapon = false; inp.wheel = 0; inp.fireEdge = false; return; }
   if (inp.reload) startReload(state, p);
-  tryFire(state, p, inp.fire, inp.fireEdge);
+  if (p.grenadeMode) {
+    if (inp.fireEdge) throwGrenade(state, p, false);
+    else if (altEdge) throwGrenade(state, p, true);
+  } else tryFire(state, p, inp.fire, inp.fireEdge);
   inp.reload = false; inp.slot = 0; inp.lastWeapon = false; inp.wheel = 0; inp.fireEdge = false;
 }

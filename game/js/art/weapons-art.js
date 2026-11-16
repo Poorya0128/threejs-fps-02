@@ -1,6 +1,4 @@
 // SALTLINE art/weapons-art.js — buildWeapon(spec) composes a gun from
-// data (ART.md §9). Every part is a separate mesh so the magazine, bolt
-// and slide can animate. Original designs, no replica of a real gun.
 import * as THREE from 'three';
 import { VM } from '../config.js';
 
@@ -21,7 +19,6 @@ function cyl(r0, r1, len, mat, x, y, z, parent, axis = 'z') {
   m.position.set(x, y, z); parent.add(m); return m;
 }
 
-// Extruded 2D side profile (x = length, y = height), small bevel.
 function extrude(pts, depth, mat, x, y, z, parent) {
   const s = new THREE.Shape();
   s.moveTo(pts[0][0], pts[0][1]);
@@ -32,25 +29,18 @@ function extrude(pts, depth, mat, x, y, z, parent) {
   m.position.set(x, y, z); parent.add(m); return m;
 }
 
-// One gun. Returns {group, muzzle, mag, bolt, accent} — muzzle is an
-// Object3D at the barrel tip (flash + tracer origin), mag/bolt animate.
 export function buildWeapon(id) {
   const spec = VM[id];
   const g = new THREE.Group();
   const accent = new THREE.MeshStandardMaterial({ color: spec.accent, metalness: 0.6, roughness: 0.5 });
   const pistol = !spec.stock && spec.barrel <= 0.14;
-  const L = 0.34 + spec.barrel; // overall length
-  // Receiver: extruded side profile with a lightening step.
+  const L = 0.34 + spec.barrel;
   extrude([[-0.16, -0.03], [L * 0.45, -0.03], [L * 0.45, 0.045], [-0.1, 0.045], [-0.16, 0.02]], 0.045, metal, 0, 0, 0, g);
-  // Barrel + muzzle device.
   cyl(0.011, 0.011, spec.barrel, metal, L * 0.45 + spec.barrel / 2, 0.012, 0, g);
   cyl(0.016, 0.016, 0.045, metal, L * 0.45 + spec.barrel - 0.01, 0.012, 0, g);
-  // Handguard (rifles/SMG) or slide (pistols).
   if (pistol) box(L * 0.42, 0.035, 0.05, poly, L * 0.2, 0.028, 0, g);
   else box(L * 0.34, 0.055, 0.06, poly, L * 0.28, 0.005, 0, g);
-  // Grip (angled, extruded) + trigger guard.
   extrude([[0, 0], [0.035, 0], [0.02, -0.09], [-0.015, -0.09]], 0.04, poly, -0.06, -0.03, 0, g);
-  // Magazine by style.
   let mag = null;
   if (spec.mag === 'curved') {
     mag = extrude([[0, 0], [0.05, 0], [0.075, -0.12], [0.03, -0.13], [-0.01, -0.02]], 0.035, accent, 0.08, -0.03, 0, g);
@@ -59,10 +49,8 @@ export function buildWeapon(id) {
   } else if (spec.mag === 'tube') {
     mag = cyl(0.014, 0.014, spec.barrel * 0.8, metal, L * 0.3, -0.02, 0, g);
   }
-  // Stock (rifles) or rear sight (pistols).
   if (spec.stock) extrude([[-0.16, -0.02], [-0.05, -0.02], [-0.05, 0.02], [-0.19, 0.02], [-0.22, -0.05]], 0.04, poly, -0.02, 0.01, 0, g);
   else box(0.03, 0.02, 0.04, metal, -0.12, 0.055, 0, g);
-  // Sights: front post + rear; rifles get a red-dot housing with a lens.
   box(0.006, 0.03, 0.006, metal, L * 0.42, 0.06, 0, g);
   if (spec.scope) {
     cyl(0.021, 0.021, 0.11, metal, 0.05, 0.055, 0, g);
@@ -73,9 +61,7 @@ export function buildWeapon(id) {
   } else {
     box(0.03, 0.018, 0.05, metal, -0.05, 0.055, 0, g);
   }
-  // Charging handle / bolt (animates on fire).
   const bolt = box(0.05, 0.015, 0.05, metal, 0.02, 0.02, 0.028, g);
-  // Knife: a blade instead of a gun.
   if (id === 'cutlass') {
     g.clear();
     const blade = box(0.3, 0.004, 0.045, brass, 0.18, 0, 0, g);

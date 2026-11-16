@@ -1,6 +1,5 @@
 // SALTLINE input.js — keyboard / mouse / pointer lock into state.input
-// (PLAN.md §4.6). Uses event.code so AZERTY works. No game logic here.
-import { INPUT } from './config.js';
+import { INPUT, BUY } from './config.js';
 import { clamp } from './math.js';
 
 const KEYMAP = {
@@ -11,10 +10,6 @@ const KEYMAP = {
 };
 
 export function createInput(canvas, input) {
-  // Chrome fires one synthetic mousemove when pointer lock engages, with
-  // movement equal to minus the pre-lock cursor position (a jump of up to
-  // the full screen). Drop exactly that first event after locking; also
-  // clamp each event so a teleported cursor can never spin the view.
   let justLocked = false;
   const onKey = (e, down) => {
     const k = KEYMAP[e.code];
@@ -22,13 +17,18 @@ export function createInput(canvas, input) {
     if (e.code === 'KeyR' && down) input.reload = true;
     if (e.code === 'KeyQ' && down) input.lastWeapon = true;
     if (e.code === 'KeyE') input.interact = down;
+    if (e.code === 'KeyB' && down) input.buyToggle = true;
     if (e.code === 'Tab') { input.scoreboard = down; e.preventDefault(); }
-    if (e.code.startsWith('Digit')) { const s = Number(e.code[5]); if (down && s >= 1 && s <= 4) input.slot = s; }
+    if (e.code.startsWith('Digit')) {
+      const s = Number(e.code[5]);
+      if (!down) return;
+      if (input.buyOpen) input.buyKey = s === 0 ? 'armor' : BUY[s - 1] ? BUY[s - 1][0] : '';
+      else if (s >= 1 && s <= 4) input.slot = s;
+    }
   };
   const onMouseMove = (e) => {
     if (!input.locked) return;
     if (justLocked) { justLocked = false; return; }
-    // A real mouse never moves that far in a single event; drop those.
     if (Math.abs(e.movementX) > 250 || Math.abs(e.movementY) > 250) return;
     input.lookDX += clamp(e.movementX, -150, 150);
     input.lookDY += clamp(e.movementY, -150, 150);
@@ -68,7 +68,6 @@ export function createInput(canvas, input) {
   return { lockPointer };
 }
 
-// Consume accumulated mouse deltas (called once per frame by main.js).
 export function consumeLook(input) {
   const dx = input.lookDX * INPUT.mouseSens;
   const dy = input.lookDY * INPUT.mouseSens;

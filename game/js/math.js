@@ -1,5 +1,4 @@
 // SALTLINE math.js — scratch vectors, seeded RNG, ray tests, helpers.
-// No allocations in hot code: module-level scratch only (PLAN.md §5.1).
 import * as THREE from 'three';
 
 export const _v0 = new THREE.Vector3();
@@ -10,11 +9,8 @@ export const _v4 = new THREE.Vector3();
 
 export const clamp = (x, a, b) => (x < a ? a : x > b ? b : x);
 export const lerp = (a, b, t) => a + (b - a) * t;
-// Frame-rate independent exponential approach: damp(x, target, rate, dt).
 export const damp = (x, target, rate, dt) => lerp(target, x, Math.exp(-rate * dt));
-export const deg2rad = (d) => d * Math.PI / 180;
 
-// mulberry32 — deterministic seeded RNG used by sim, bots and FX.
 export function mulberry32(seed) {
   let a = seed >>> 0;
   return function next() {
@@ -25,11 +21,8 @@ export function mulberry32(seed) {
   };
 }
 
-// Ray vs AABB (slab test). min/max are Vector3-like {x,y,z}. Returns
-// distance along the ray, or -1 on a miss. dir must be normalized.
 export function rayAABB(ox, oy, oz, dx, dy, dz, min, max, maxDist) {
   let tmin = 0, tmax = maxDist;
-  // x
   let t1, t2;
   if (dx !== 0) { const ix = 1 / dx; t1 = (min.x - ox) * ix; t2 = (max.x - ox) * ix; if (t1 > t2) { const t = t1; t1 = t2; t2 = t; } if (t1 > tmin) tmin = t1; if (t2 < tmax) tmax = t2; if (tmin > tmax) return -1; }
   else if (ox < min.x || ox > max.x) return -1;
@@ -40,7 +33,6 @@ export function rayAABB(ox, oy, oz, dx, dy, dz, min, max, maxDist) {
   return tmin;
 }
 
-// Ray vs sphere. Returns distance, or -1.
 export function raySphere(ox, oy, oz, dx, dy, dz, cx, cy, cz, r, maxDist) {
   const lx = cx - ox, ly = cy - oy, lz = cz - oz;
   const tca = lx * dx + ly * dy + lz * dz;
@@ -52,8 +44,6 @@ export function raySphere(ox, oy, oz, dx, dy, dz, cx, cy, cz, r, maxDist) {
   return t <= maxDist ? t : -1;
 }
 
-// Ray vs capsule (segment a→b, radius r). Returns distance, or -1.
-// Used for chest/stomach/arm/leg hitboxes (PLAN.md §7).
 export function rayCapsule(ox, oy, oz, dx, dy, dz, ax, ay, az, bx, by, bz, r, maxDist) {
   const abx = bx - ax, aby = by - ay, abz = bz - az;
   const aox = ox - ax, aoy = oy - ay, aoz = oz - az;
@@ -67,13 +57,32 @@ export function rayCapsule(ox, oy, oz, dx, dy, dz, ax, ay, az, bx, by, bz, r, ma
   if (disc < 0) return -1;
   const t = (-b - Math.sqrt(disc)) / a;
   if (t < 0 || t > maxDist) return -1;
-  const s = (dAb * t + abAo) / ab2; // position along the segment
+  const s = (dAb * t + abAo) / ab2;
   if (s < 0) return raySphere(ox, oy, oz, dx, dy, dz, ax, ay, az, r, maxDist);
   if (s > 1) return raySphere(ox, oy, oz, dx, dy, dz, bx, by, bz, r, maxDist);
   return t;
 }
 
-// Point inside AABB (with a small margin for capsule tests).
-export function pointInBox(x, y, z, min, max) {
-  return x >= min.x && x <= max.x && y >= min.y && y <= max.y && z >= min.z && z <= max.z;
+export function losBlocked(boxes, x0, y0, z0, x1, y1, z1) {
+  const dx = x1 - x0, dy = y1 - y0, dz = z1 - z0;
+  const len = Math.hypot(dx, dy, dz);
+  if (len < 0.01) return false;
+  for (let i = 0; i < boxes.length; i++) {
+    const b = boxes[i];
+    const t = rayAABB(x0, y0, z0, dx / len, dy / len, dz / len, b.min, b.max, len);
+    if (t >= 0 && t < len - 0.05) return true;
+  }
+  return false;
+}
+
+export function smokeBlocks(smokes, time, x0, y0, z0, x1, y1, z1) {
+  for (let i = 0; i < smokes.length; i++) {
+    const s = smokes[i];
+    if (!s.active || time > s.t + s.dur) continue;
+    const dx = x1 - x0, dy = y1 - y0, dz = z1 - z0;
+    const len = Math.hypot(dx, dy, dz);
+    if (len < 0.01) continue;
+    if (raySphere(x0, y0, z0, dx / len, dy / len, dz / len, s.x, s.y, s.z, s.r, len) >= 0) return true;
+  }
+  return false;
 }

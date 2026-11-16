@@ -1,6 +1,4 @@
 // SALTLINE art/post.js — HDR pipeline (ART.md §2): world -> HDR target
-// (HalfFloat, MSAA) -> bloom -> final pass (exposure, ACES, grade,
-// vignette, grain) -> screen. The renderer itself does no tone mapping.
 import * as THREE from 'three';
 import { RENDER } from '../config.js';
 
@@ -21,15 +19,9 @@ export function createPost(renderer) {
   renderer.getSize(size);
   const w = Math.max(2, size.x | 0), h = Math.max(2, size.y | 0);
 
-  // Note: no depthTexture here — a multisampled (samples>0) target cannot
-  // also carry a depth texture in WebGL2, and the render comes out black.
-  // SSAO (which needs depth) gets its own depth-only target in M5.
   const hdr = new THREE.WebGLRenderTarget(w, h, {
     type: THREE.HalfFloatType, samples: 4,
   });
-  // Bloom chain at half resolution: 3 mip levels, 13-tap down / 9-tap tent up.
-  // Down writes blooms[]; up writes a separate up[] chain (never render into
-  // a target while sampling it — that is a GL feedback loop).
   const bw = w >> 1, bh = h >> 1;
   const blooms = [], ups = [];
   for (let i = 0; i < 3; i++) {
@@ -80,11 +72,9 @@ export function createPost(renderer) {
       c += texture2D(tBloom, vUv).rgb * ${RENDER.bloomStrength.toFixed(3)};
       c *= exposure;
       c = aces(c);
-      // Grade: warm highlights, cool shadows, saturation 0.95.
       float l = dot(c, vec3(0.2126, 0.7152, 0.0722));
       c = mix(vec3(l), c, 0.95);
       c.r += 0.03 * l * l; c.b += 0.02 * (1.0 - l) * (1.0 - l);
-      // Vignette 0.15 + faint animated grain 0.015.
       vec2 q = vUv - 0.5;
       c *= 1.0 - 0.15 * dot(q, q) * 2.2;
       c += (hash(vUv * 913.0 + fract(time) * 7.0) - 0.5) * 0.015;
@@ -104,8 +94,6 @@ export function createPost(renderer) {
   quadScene.add(quad);
 
   function renderBloom(renderer, src) {
-    // Threshold is implicit: only HDR values above ~1.0 survive the first
-    // downsample strongly; the chain blurs the bright tail into the bloom.
     let cur = src;
     for (let i = 0; i < blooms.length; i++) {
       downMat.uniforms.tSrc.value = cur.texture;
@@ -116,8 +104,6 @@ export function createPost(renderer) {
       renderer.render(quadScene, quadCam);
       cur = t;
     }
-    // Upsample smallest level into ups[2] (no add), then up the chain,
-    // adding the matching bloom level at each step.
     upMat.uniforms.uHasAdd.value = 0;
     upMat.uniforms.tSrc.value = blooms[2].texture;
     upMat.uniforms.texel.value.set(1 / ups[2].width, 1 / ups[2].height);

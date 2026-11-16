@@ -1,12 +1,9 @@
 // SALTLINE art/fx.js — pooled effects (ART.md §10). Drains state.fxEvents
-// (written by weapons.js) into visual pools. No allocations per frame:
-// fixed pools, ring indices, scratch vectors.
 import * as THREE from 'three';
 
 const _a = new THREE.Vector3(), _b = new THREE.Vector3(), _c = new THREE.Vector3();
 
 export function createFx(scene) {
-  // --- tracers: 12 stretched boxes, HDR core, 0.12 s life ---
   const tracerMat = new THREE.MeshBasicMaterial({ color: 0xffe9b0, transparent: true, opacity: 0, blending: THREE.AdditiveBlending, depthWrite: false });
   const tracers = [];
   for (let i = 0; i < 12; i++) {
@@ -15,7 +12,6 @@ export function createFx(scene) {
     tracers.push({ m, t: 0 });
   }
   let trIdx = 0;
-  // --- impact decals: 24 dark discs, persist for the round ---
   const decalGeo = new THREE.CircleGeometry(0.09, 10);
   const decals = [];
   for (let i = 0; i < 24; i++) {
@@ -24,7 +20,6 @@ export function createFx(scene) {
     decals.push(m);
   }
   let decIdx = 0;
-  // --- sparks/dust: one Points cloud, 96 particles ---
   const SN = 96;
   const sPos = new Float32Array(SN * 3), sVel = new Float32Array(SN * 3), sLife = new Float32Array(SN);
   const sGeo = new THREE.BufferGeometry();
@@ -32,7 +27,6 @@ export function createFx(scene) {
   const sparks = new THREE.Points(sGeo, new THREE.PointsMaterial({ color: 0xffd9a0, size: 0.05, transparent: true, opacity: 0.95, blending: THREE.AdditiveBlending, depthWrite: false }));
   sparks.frustumCulled = false; scene.add(sparks);
   let spIdx = 0;
-  // --- shells: 24 brass casings, bounce on the ground, fade after 4 s ---
   const shells = [];
   const shellGeo = new THREE.BoxGeometry(0.012, 0.006, 0.022);
   const shellMat = new THREE.MeshStandardMaterial({ color: 0xb08d3f, metalness: 1, roughness: 0.35 });
@@ -42,10 +36,28 @@ export function createFx(scene) {
     shells.push({ m, vx: 0, vy: 0, vz: 0, t: 0 });
   }
   let shIdx = 0;
-  // --- world muzzle light: one reused point light ---
   const flashLight = new THREE.PointLight(0xffc27a, 0, 16, 1.8);
   scene.add(flashLight);
-  let flashT = 0;
+  let flashT = 0, flashDur = 0.06, flashMax = 22;
+  const smokeGeo = new THREE.SphereGeometry(1, 10, 8);
+  const smokePuffs = [];
+  for (let i = 0; i < 4; i++) {
+    const group = [];
+    for (let j = 0; j < 5; j++) {
+      const m = new THREE.Mesh(smokeGeo, new THREE.MeshBasicMaterial({ color: 0x9aa0a3, transparent: true, opacity: 0.5, depthWrite: false }));
+      m.visible = false; scene.add(m);
+      group.push(m);
+    }
+    smokePuffs.push(group);
+  }
+  const nadeGeo = new THREE.SphereGeometry(0.07, 8, 6);
+  const nadeMat = new THREE.MeshStandardMaterial({ color: 0x2a2e22, roughness: 0.6, metalness: 0.4 });
+  const nadeMeshes = [];
+  for (let i = 0; i < 8; i++) {
+    const m = new THREE.Mesh(nadeGeo, nadeMat);
+    m.visible = false; scene.add(m);
+    nadeMeshes.push(m);
+  }
   function spawnTracer(x, y, z, ex, ey, ez) {
     const tr = tracers[trIdx]; trIdx = (trIdx + 1) % tracers.length;
     _a.set(x, y, z); _b.set(ex, ey, ez);
@@ -80,21 +92,43 @@ export function createFx(scene) {
   }
 
   return {
-    // Drain the ring buffer and step all pools.
     update(state, viewmodel, dt, chars) {
       const ev = state.fxEvents;
       while (state.fxHead !== state.fxTail) {
         const e = ev[state.fxHead];
         state.fxHead = (state.fxHead + 1) % 32;
         if (e.kind === 0) spawnTracer(e.x, e.y, e.z, e.dx, e.dy, e.dz);
-        else if (e.kind === 1) { viewmodel.flash(); flashLight.position.set(e.x, e.y, e.z); flashLight.intensity = 22; flashT = 0.06; }
+        else if (e.kind === 1) { viewmodel.flash(); flashLight.position.set(e.x, e.y, e.z); flashLight.intensity = 22; flashT = 0.06; flashDur = 0.06; flashMax = 22; }
         else if (e.kind === 2) spawnDecal(e.x, e.y, e.z, e.dx, e.dy, e.dz);
         else if (e.kind === 3) spawnSparks(e.x, e.y, e.z);
         else if (e.kind === 4) spawnShell(e.x, e.y, e.z, e.dx, e.dz);
         else if (e.kind === 6 && chars) chars.flash(e.mat);
+        else if (e.kind === 7) {
+          spawnSparks(e.x, e.y, e.z); spawnSparks(e.x, e.y, e.z); spawnSparks(e.x, e.y, e.z);
+          flashLight.position.set(e.x, e.y, e.z); flashLight.intensity = 80; flashT = 0.3; flashDur = 0.3; flashMax = 80;
+        }
       }
-      if (flashT > 0) { flashT -= dt; flashLight.intensity = 22 * Math.max(0, flashT / (0.06)); }
+      if (flashT > 0) { flashT -= dt; flashLight.intensity = flashMax * Math.max(0, flashT / flashDur); }
       else flashLight.intensity = 0;
+      for (let i = 0; i < 4; i++) {
+        const s = state.smokes[i], group = smokePuffs[i];
+        const grow = s.active ? Math.min(1, (state.time - s.t) / 1) : 0;
+        for (let j = 0; j < 5; j++) {
+          const m = group[j];
+          if (!s.active) { m.visible = false; continue; }
+          const a = j * 2.4;
+          m.position.set(s.x + Math.cos(a) * s.r * 0.45, s.y + (j % 2) * 0.6, s.z + Math.sin(a) * s.r * 0.45);
+          m.scale.setScalar(Math.max(0.01, s.r * 0.55 * grow));
+          m.material.opacity = 0.5 * grow;
+          m.visible = true;
+        }
+      }
+      for (let i = 0; i < 8; i++) {
+        const g = state.nades[i], m = nadeMeshes[i];
+        if (!g.active) { m.visible = false; continue; }
+        m.position.set(g.x, g.y, g.z);
+        m.visible = true;
+      }
       for (const tr of tracers) {
         if (tr.t <= 0) continue;
         tr.t -= dt;

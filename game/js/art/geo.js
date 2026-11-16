@@ -1,11 +1,7 @@
 // SALTLINE art/geo.js — geometry kit (ART.md §4). Every box is bevelled
-// (hard 90-degree edges + flat shading look fake). World geometry is
-// merged per material (draw-call budget, ART.md §12).
 import * as THREE from 'three';
 import { MATERIALS } from '../config.js';
 
-// Box with 1-segment chamfered edges. ExtrudeGeometry bevels the front and
-// back faces; the shape is inset by r so the final size is exact.
 export function bevelBox(sx, sy, sz, r = 0.03) {
   const w = Math.max(sx - 2 * r, 0.02), h = Math.max(sy - 2 * r, 0.02);
   const d = Math.max(sz - 2 * r, 0.02);
@@ -20,8 +16,6 @@ export function bevelBox(sx, sy, sz, r = 0.03) {
   return g;
 }
 
-// World-space UVs: uv = world position projected on the face's dominant
-// axis, 1 repeat per 2 m. No stretching, ever.
 export function applyWorldUV(geo, scale = 0.5) {
   const pos = geo.attributes.position;
   const nor = geo.attributes.normal;
@@ -39,7 +33,6 @@ export function applyWorldUV(geo, scale = 0.5) {
   return geo;
 }
 
-// Concatenate non-indexed geometries (no addons allowed in the game).
 export function mergeGeos(geos) {
   const list = [];
   let vcount = 0;
@@ -69,9 +62,6 @@ export function mergeGeos(geos) {
   return out;
 }
 
-// Baked ambient occlusion into the vertex colour channel: for each vertex,
-// cast a few cosine-weighted short rays against the world AABBs. A uniform
-// grid keeps the broadphase cheap. Runs once at load; logs its own time.
 const DIRS = [];
 for (let i = 0; i < 8; i++) {
   const a = (i / 8) * Math.PI * 2, e = 0.45 + (i % 2) * 0.35;
@@ -82,7 +72,6 @@ export function bakeAO(geo, boxes) {
   const t0 = performance.now();
   const pos = geo.attributes.position, nor = geo.attributes.normal;
   const col = geo.attributes.color;
-  // Uniform grid over the boxes (cell 4 m) for the ray broadphase.
   const cell = 4, grid = new Map();
   const key = (x, z) => `${Math.floor(x / cell)},${Math.floor(z / cell)}`;
   for (const b of boxes) {
@@ -122,7 +111,6 @@ export function bakeAO(geo, boxes) {
     const nx = nor.getX(v), ny = nor.getY(v), nz = nor.getZ(v);
     let occ = 0;
     for (let d = 0; d < DIRS.length; d++) {
-      // Reflect the hemisphere around the vertex normal.
       const dir = DIRS[d];
       let dx = dir[0], dy = dir[1], dz = dir[2];
       const dot = dx * nx + dy * ny + dz * nz;
@@ -130,15 +118,12 @@ export function bakeAO(geo, boxes) {
       if (hit(x + nx * 0.02, y + ny * 0.02, z + nz * 0.02, dx, dy, dz)) occ++;
     }
     const ao = 1 - 0.55 * (occ / DIRS.length);
-    // Dirt mask: darker near the floor.
     const dirt = 1 - 0.18 * (1 - Math.min(1, Math.max(0, y / 0.6)));
     col.setXYZ(v, col.getX(v) * ao * dirt, col.getY(v) * ao * dirt, col.getZ(v) * ao * dirt);
   }
   return performance.now() - t0;
 }
 
-// World meshes: one merged bevelled mesh per material. Boxes thinner than
-// 5 cm are paint strips with no mesh. AO is baked per merged mesh.
 export function buildWorld(scene, boxes) {
   const t0 = performance.now();
   const byMat = new Map();
