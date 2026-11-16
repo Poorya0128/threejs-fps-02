@@ -10,21 +10,21 @@ export function skyMaterial(sunDir) {
 		side: BackSide, depthWrite: false, fog: false,
 		uniforms: { zen: { value: new Color(PALETTE.skyZenith) }, hor: { value: new Color(PALETTE.horizon) }, sun: { value: sunDir }, sc: { value: new Color(PALETTE.sun) } },
 		vertexShader: 'varying vec3 vD; void main(){ vD = position; gl_Position = projectionMatrix * modelViewMatrix * vec4(position, 1.); }',
-		fragmentShader: `varying vec3 vD; uniform vec3 zen, hor, sun, sc;
-			float h(vec2 p){ return fract(sin(dot(p, vec2(127.1, 311.7))) * 43758.5453); }
-			float n(vec2 p){ vec2 i = floor(p), f = fract(p); f *= f * (3. - 2. * f); return mix(mix(h(i), h(i + vec2(1, 0)), f.x), mix(h(i + vec2(0, 1)), h(i + 1.), f.x), f.y); }
-			void main(){
-				vec3 d = normalize(vD); float y = d.y, s = max(dot(d, sun), 0.);
-				vec3 c = mix(hor, zen, pow(clamp(y, 0., 1.), .45));
-				c = mix(c, hor * vec3(1.15, .92, .82), (1. - smoothstep(0., .35, y)) * pow(s, 2.) * .8);
-				c += sc * (pow(s, 6.) * .28 + pow(s, 60.) * .7 + smoothstep(.9994, .9997, s) * 30.);
-				vec2 q = d.xz / (y + .25) * .9 + vec2(3., 1.); float cl = 0., a = .5;
-				for (int k = 0; k < 5; k++) { cl += n(q) * a; q = q * 2.03 + 1.3; a *= .5; }
-				cl = smoothstep(.5, .78, cl) * smoothstep(.03, .3, y);
-				c = mix(c, mix(vec3(.85, .62, .58), sc * 1.4, pow(s, 3.)), cl * .55);
-				c = mix(c, hor * .42, smoothstep(.0, -.08, y));
-				gl_FragColor = vec4(c, 1.);
-			}`,
+		fragmentShader: `varying vec3 vD;uniform vec3 zen,hor,sun,sc;
+	float h(vec2 p){return fract(sin(dot(p,vec2(127.1,311.7)))*43758.5453);}
+	float n(vec2 p){vec2 i=floor(p),f=fract(p);f*=f*(3.-2.*f);return mix(mix(h(i),h(i+vec2(1,0)),f.x),mix(h(i+vec2(0,1)),h(i+1.),f.x),f.y);}
+	void main(){
+	vec3 d=normalize(vD);float y=d.y,s=max(dot(d,sun),0.);
+	vec3 c=mix(hor,zen,pow(clamp(y,0.,1.),.45));
+	c=mix(c,hor*vec3(1.15,.92,.82),(1.-smoothstep(0.,.35,y))*pow(s,2.)*.8);
+	c+=sc*(pow(s,6.)*.28+pow(s,60.)*.7+smoothstep(.9994,.9997,s)*30.);
+	vec2 q=d.xz/(y+.25)*.9+vec2(3.,1.);float cl=0.,a=.5;
+	for (int k=0;k<5;k++){cl+=n(q)*a;q=q*2.03+1.3;a*=.5;}
+	cl=smoothstep(.5,.78,cl)*smoothstep(.03,.3,y);
+	c=mix(c,mix(vec3(.85,.62,.58),sc*1.4,pow(s,3.)),cl*.55);
+	c=mix(c,hor*.42,smoothstep(.0,-.08,y));
+	gl_FragColor=vec4(c,1.);
+	}`,
 	});
 }
 

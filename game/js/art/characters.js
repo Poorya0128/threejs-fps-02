@@ -3,7 +3,7 @@
 // hands reach the held weapon through analytic two-bone IK.
 import { Bone, Skeleton, SkinnedMesh, Group, Mesh, MeshStandardMaterial, Float32BufferAttribute, Uint16BufferAttribute, CapsuleGeometry,
 	SphereGeometry, CylinderGeometry, Matrix4, Vector3, Quaternion, Euler, Color } from 'three';
-import { Bld, boxInto } from './geo.js';
+import { Bld, boxInto } from './mesh.js';
 import { buildWeapon, weaponMaterial } from './weapons-art.js';
 import { TEAM_LOOK } from '../config.js';
 

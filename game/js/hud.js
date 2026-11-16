@@ -29,13 +29,13 @@ export function createHud(map) {
 	g.font = 'bold 26px sans-serif'; g.textAlign = 'center'; g.textBaseline = 'middle'; g.fillStyle = 'rgba(240,160,60,.9)';
 	for (const [z, l] of [[map.zones.sitePans, 'A'], [map.zones.siteBoiler, 'B']]) g.fillText(l, (z.cx - B.x0) * PX, (z.cz - B.z0) * PX);
 	const rc = E.radar.getContext('2d');
+	const dot = (x, z, r, c) => { rc.fillStyle = c; rc.beginPath(); rc.arc((x - B.x0) * PX, (z - B.z0) * PX, r, 0, 7); rc.fill(); };
 	function drawRadar(state, v) {
 		const R = 88;
 		rc.clearRect(0, 0, 176, 176);
 		rc.save(); rc.beginPath(); rc.arc(R, R, R - 1, 0, 7); rc.clip();
 		rc.translate(R, R); rc.rotate(v.yaw); rc.translate(-(v.pos.x - B.x0) * PX, -(v.pos.z - B.z0) * PX);
 		rc.drawImage(bg, 0, 0);
-		const dot = (x, z, r, c) => { rc.fillStyle = c; rc.beginPath(); rc.arc((x - B.x0) * PX, (z - B.z0) * PX, r, 0, 7); rc.fill(); };
 		const f = state.fuse;
 		if (f.planted || f.dropped) dot(f.x, f.z, 5 + Math.sin(state.time * 8) * 2, '#f0a03c');
 		for (const a of state.agents) {
@@ -97,7 +97,7 @@ export function createHud(map) {
 			text('timer', `${Math.floor(t / 60)}:${String(t % 60).padStart(2, '0')}`); cls('timer', 'hot', state.phase === 'planted' || (state.phase === 'live' && t <= 10));
 			text('rnd', state.phase === 'buy' ? `ROUND ${state.round} · BUY` : state.phase === 'planted' ? 'FUSE PLANTED' : `ROUND ${state.round}`);
 			text('scS', String(state.score.strand)); text('scB', String(state.score.bastion));
-			let mask = 0; state.agents.forEach((a, i) => { if (a.alive) mask |= 1 << i; });
+			let mask = 0; for (let i = 0; i < state.agents.length; i++) if (state.agents[i].alive) mask |= 1 << i;
 			if (mask !== last.mask) { last.mask = mask; html('pipS', pips(state, 'strand')); html('pipB', pips(state, 'bastion')); }
 			if (state.killfeed.length !== feedLen || (state.killfeed.length && state.killfeed[state.killfeed.length - 1].t !== feedT)) {
 				feedLen = state.killfeed.length; feedT = feedLen ? state.killfeed[feedLen - 1].t : -1;

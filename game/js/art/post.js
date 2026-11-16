@@ -4,13 +4,13 @@ import { RENDER } from '../config.js';
 
 const ACES = `
 vec3 aces(vec3 x){
-	return clamp((x * (2.51 * x + 0.03)) / (x * (2.43 * x + 0.59) + 0.14), 0.0, 1.0);
+	return clamp((x*(2.51*x+0.03))/(x*(2.43*x+0.59)+0.14),0.0,1.0);
 }`;
 
 function quadMaterial(frag, uniforms) {
 	return new THREE.ShaderMaterial({ uniforms, vertexShader: `
-		varying vec2 vUv;
-		void main(){ vUv = uv; gl_Position = vec4(position.xy, 0.0, 1.0); }`,
+	varying vec2 vUv;
+	void main(){vUv=uv;gl_Position=vec4(position.xy,0.0,1.0);}`,
 		fragmentShader: frag, depthTest: false, depthWrite: false });
 }
 
@@ -29,46 +29,46 @@ export function createPost(renderer) {
 		ups.push(new THREE.WebGLRenderTarget(Math.max(2, bw >> i), Math.max(2, bh >> i), { type: THREE.HalfFloatType }));
 	}
 	const downMat = quadMaterial(`
-		varying vec2 vUv; uniform sampler2D tSrc; uniform vec2 texel; uniform float uThresh;
-		void main(){
-			vec3 c = vec3(0.0);
-			for (int i = -2; i <= 2; i++) for (int j = -2; j <= 2; j++) {
-				int m = abs(i) + abs(j);
-				float w = (i == 0 && j == 0) ? 4.0 : m == 1 ? 2.0 : (m == 2 && (i == 0 || j == 0 || abs(i) == 1)) ? 1.0 : 0.0;
-				c += texture2D(tSrc, vUv + texel * vec2(float(i), float(j))).rgb * w;
-			}
-			gl_FragColor = vec4(max(c * 0.0625 - vec3(uThresh), 0.0), 1.0);
-		}`, { tSrc: { value: null }, texel: { value: new THREE.Vector2() }, uThresh: { value: 0 } });
+	varying vec2 vUv;uniform sampler2D tSrc;uniform vec2 texel;uniform float uThresh;
+	void main(){
+	vec3 c=vec3(0.0);
+	for (int i=-2;i<=2;i++)for (int j=-2;j<=2;j++){
+	int m=abs(i)+abs(j);
+	float w=(i==0&&j==0)?4.0:m==1?2.0:(m==2&&(i==0||j==0||abs(i)==1))?1.0:0.0;
+	c+=texture2D(tSrc,vUv+texel*vec2(float(i),float(j))).rgb*w;
+	}
+	gl_FragColor=vec4(max(c*0.0625-vec3(uThresh),0.0),1.0);
+	}`, { tSrc: { value: null }, texel: { value: new THREE.Vector2() }, uThresh: { value: 0 } });
 	const upMat = quadMaterial(`
-		varying vec2 vUv; uniform sampler2D tSrc; uniform sampler2D tAdd; uniform vec2 texel; uniform float uHasAdd;
-		void main(){
-			vec3 c = vec3(0.0);
-			for (int i = -1; i <= 1; i++) for (int j = -1; j <= 1; j++) {
-				float w = (i == 0 && j == 0) ? 4.0 : (abs(i) + abs(j) == 1) ? 2.0 : 1.0;
-				c += texture2D(tSrc, vUv + texel * vec2(float(i), float(j))).rgb * w;
-			}
-			c *= 0.0625;
-			if (uHasAdd > 0.5) c += texture2D(tAdd, vUv).rgb;
-			gl_FragColor = vec4(c, 1.0);
-		}`, { tSrc: { value: null }, tAdd: { value: null }, texel: { value: new THREE.Vector2() }, uHasAdd: { value: 0 } });
+	varying vec2 vUv;uniform sampler2D tSrc;uniform sampler2D tAdd;uniform vec2 texel;uniform float uHasAdd;
+	void main(){
+	vec3 c=vec3(0.0);
+	for (int i=-1;i<=1;i++)for (int j=-1;j<=1;j++){
+	float w=(i==0&&j==0)?4.0:(abs(i)+abs(j)==1)?2.0:1.0;
+	c+=texture2D(tSrc,vUv+texel*vec2(float(i),float(j))).rgb*w;
+	}
+	c*=0.0625;
+	if (uHasAdd>0.5)c+=texture2D(tAdd,vUv).rgb;
+	gl_FragColor=vec4(c,1.0);
+	}`, { tSrc: { value: null }, tAdd: { value: null }, texel: { value: new THREE.Vector2() }, uHasAdd: { value: 0 } });
 	const finalMat = quadMaterial(`
-		varying vec2 vUv; uniform sampler2D tSrc; uniform sampler2D tBloom;
-		uniform float exposure, time;
-		${ACES}
-		float hash(vec2 p){ return fract(sin(dot(p, vec2(127.1, 311.7))) * 43758.5453); }
-		void main(){
-			vec3 c = texture2D(tSrc, vUv).rgb;
-			c += texture2D(tBloom, vUv).rgb * ${RENDER.bloomStrength.toFixed(3)};
-			c *= exposure;
-			c = aces(c);
-			float l = dot(c, vec3(0.2126, 0.7152, 0.0722));
-			c = mix(vec3(l), c, 0.95);
-			c.r += 0.03 * l * l; c.b += 0.02 * (1.0 - l) * (1.0 - l);
-			vec2 q = vUv - 0.5;
-			c *= 1.0 - 0.15 * dot(q, q) * 2.2;
-			c += (hash(vUv * 913.0 + fract(time) * 7.0) - 0.5) * 0.015;
-			gl_FragColor = vec4(c, 1.0);
-		}`, {
+	varying vec2 vUv;uniform sampler2D tSrc;uniform sampler2D tBloom;
+	uniform float exposure,time;
+	${ACES}
+	float hash(vec2 p){return fract(sin(dot(p,vec2(127.1,311.7)))*43758.5453);}
+	void main(){
+	vec3 c=texture2D(tSrc,vUv).rgb;
+	c+=texture2D(tBloom,vUv).rgb*${RENDER.bloomStrength.toFixed(3)};
+	c*=exposure;
+	c=aces(c);
+	float l=dot(c,vec3(0.2126,0.7152,0.0722));
+	c=mix(vec3(l),c,0.95);
+	c.r+=0.03*l*l;c.b+=0.02*(1.0-l)*(1.0-l);
+	vec2 q=vUv-0.5;
+	c*=1.0-0.15*dot(q,q)*2.2;
+	c+=(hash(vUv*913.0+fract(time)*7.0)-0.5)*0.015;
+	gl_FragColor=vec4(c,1.0);
+	}`, {
 		tSrc: { value: null }, tBloom: { value: null },
 		exposure: { value: RENDER.exposure }, time: { value: 0 },
 	});

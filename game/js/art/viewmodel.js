@@ -3,11 +3,11 @@
 import { Group, Mesh, ShaderMaterial, PlaneGeometry, AdditiveBlending, DoubleSide, DirectionalLight, HemisphereLight, Vector3, CapsuleGeometry,
 	CylinderGeometry, Matrix4, Quaternion, Color, Euler } from 'three';
 import { buildWeapon, weaponMaterial } from './weapons-art.js';
-import { Bld, boxInto } from './geo.js';
+import { Bld, boxInto } from './mesh.js';
 import { damp, losBlocked } from '../math.js';
-import { TEAM_LOOK } from '../config.js';
+import { TEAM_LOOK, WEAPONS } from '../config.js';
 
-const HIP = [0.11, -0.125, -0.33], ADS = [0, -0.074, -0.22];
+const HOLD = { pistol: [0.075, -0.105, -0.43], knife: [0.12, -0.13, -0.3], rifle: [0.11, -0.125, -0.33] }, ADS = [0, -0.074, -0.22];
 const lin = (h) => { const c = new Color(h); return [c.r, c.g, c.b]; };
 const _m = new Matrix4(), _q = new Quaternion(), _e = new Euler(), _v = new Vector3(), _c = new Vector3(), _a = new Vector3(), _b = new Vector3(), _s = new Vector3(1, 1, 1), _up = new Vector3(0, 1, 0);
 function limb(B, a, b, r0, r1, col, e) {
@@ -37,11 +37,11 @@ function buildArms(team, left, pistol) {
 const flashMat = new ShaderMaterial({
 	uniforms: { uT: { value: 0 }, uSeed: { value: 0 } }, transparent: true, depthWrite: false, blending: AdditiveBlending, side: DoubleSide,
 	vertexShader: 'varying vec2 vUv; void main(){ vUv = uv; gl_Position = projectionMatrix * modelViewMatrix * vec4(position, 1.); }',
-	fragmentShader: `varying vec2 vUv; uniform float uT, uSeed;
-		void main(){ vec2 p = vUv * 2. - 1.; float r = length(p), a = atan(p.y, p.x);
-			float rays = pow(abs(sin(a * 3. + uSeed * 6.)), 10.) * .7 + pow(abs(sin(a * 5. + uSeed * 2.)), 16.) * .5;
-			float i = (exp(-r * r * 18.) * 3. + rays * smoothstep(1., .0, r) * 1.6) * uT;
-			gl_FragColor = vec4(vec3(1., .66, .32) * i * 5., 1.); }`,
+	fragmentShader: `varying vec2 vUv;uniform float uT,uSeed;
+	void main(){vec2 p=vUv*2.-1.;float r=length(p),a=atan(p.y,p.x);
+	float rays=pow(abs(sin(a*3.+uSeed*6.)),10.)*.7+pow(abs(sin(a*5.+uSeed*2.)),16.)*.5;
+	float i=(exp(-r*r*18.)*3.+rays*smoothstep(1.,.0,r)*1.6)*uT;
+	gl_FragColor=vec4(vec3(1.,.66,.32)*i*5.,1.);}`,
 });
 
 export function createViewmodel(vmScene, sunDir) {
@@ -68,13 +68,14 @@ export function createViewmodel(vmScene, sunDir) {
 		}
 		s.draw = curKey ? 1 : 0; cur = cache[k]; curKey = k; gun.add(cur.group); cur.muzzle.add(flash);
 	}
+	let HIP = HOLD.rifle;
 	return {
 		group: root,
 		muzzleObj: () => (cur ? cur.muzzle : null),
 		flash() { s.flashT = 0.05; flashMat.uniforms.uSeed.value = Math.random(); flash.rotation.z = Math.random() * 3; },
 		update(state, cam, dt) {
 			const p = state.player, id = p.weapons[p.active];
-			setWeapon(id, p.team);
+			setWeapon(id, p.team); HIP = HOLD[WEAPONS[id].cls] || HOLD.rifle;
 			root.visible = !(p.scoped && id === 'longbow');
 			if (p.shotsFired !== s.shots) { if (p.shotsFired > s.shots) s.kickV += id === 'longbow' || id === 'breaker' ? 2.2 : 1; s.shots = p.shotsFired; }
 			const rel = Math.max(p.reloadT, p.reloadShell);

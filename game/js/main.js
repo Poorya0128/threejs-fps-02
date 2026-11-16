@@ -92,20 +92,21 @@ startRound(state);
 if (SCENARIO) applyScenario(state, SCENARIO, tick);
 else if (!AUTOPLAY && !CAM) showMenu('title');
 else state.input.canLock = !AUTOPLAY;
+if (CAM) { state.buyOpen = false; state.scenarioDone = true; }
 
 const next = DRAW ? requestAnimationFrame : (f) => setTimeout(() => f(performance.now()), 1); // tests without drawing are not tied to the display
 function frame(now) {
 	next(frame);
 	const dt = Math.min((now - last) / 1000, 0.1); last = now;
 	const p = state.player;
-	if (!state.paused && !state.scenarioDone && !camView) {
+	if (!state.paused && !state.scenarioDone) {
 		if (state.input.locked && p.alive) applyLook(state.input, p);
 		acc += dt;
 		let n = 0;
 		while (acc >= TICK && n++ < MAX_TICKS_PER_FRAME) { tick(TICK); acc -= TICK; }
 		if (n > MAX_TICKS_PER_FRAME) acc = 0;
 		for (let i = 1; AUTOPLAY && i < SPEED; i++) tick(TICK);
-	} else if (camView && frames < 3) tick(TICK);
+	}
 	if (state.matchOver && menu.end.hidden && !AUTOPLAY) {
 		el('endT').textContent = state.score.strand > state.score.bastion ? 'STRAND WINS' : 'BASTION WINS';
 		el('endS').textContent = `FINAL · ${state.score.strand} — ${state.score.bastion}`;

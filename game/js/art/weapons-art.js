@@ -4,7 +4,7 @@
 // magazine are separate meshes so the viewmodel can animate them.
 import { Shape, Path, ExtrudeGeometry, LatheGeometry, Vector2, Matrix4, Mesh, Group, Object3D, Color, MeshBasicMaterial, AdditiveBlending,
 	PlaneGeometry, CanvasTexture } from 'three';
-import { Bld, boxInto } from './geo.js';
+import { Bld, boxInto } from './mesh.js';
 import { procMaterial } from './materials.js';
 
 const lin = (hex) => { const c = new Color(hex); return [c.r, c.g, c.b]; };
