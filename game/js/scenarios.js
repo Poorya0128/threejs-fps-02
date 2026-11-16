@@ -28,7 +28,6 @@ export function applyScenario(state, name, tick) {
 		put(S[0], 1.6, -28.5, -80); put(S[1], -5, -21.4, -100);
 		put(B[0], 10.5, -25.5, 92); put(B[1], 15, -21.6, 100); put(B[2], 20, -28.5, 85);
 		B[0].crouch = 1; B[1].brain.crouch = false; B[3].alive = S[2].alive = false;
-		feed(state, 'Strand plan: rush Pans'); feed(state, 'Bastion-6: 2 contact Pans West');
 		feed(state, '', { a: 'Strand-2', b: 'Bastion-8', w: 'TALON', head: true }); feed(state, '', { a: 'Bastion-5', b: 'Strand-3', w: 'GAVEL' });
 		state.input.fire = true;
 		run(tick, 40, () => state.shots.fired > 6 && p.shotsFired >= 3 && state.time - p.lastShotT < .01);
@@ -39,13 +38,13 @@ export function applyScenario(state, name, tick) {
 		for (const a of state.agents) a.hasFuse = a === c;
 		state.fuse.carrier = c;
 		for (let i = 0; i < 200 && state.phase !== 'planted'; i++) { put(c, 13, 22.8, 90); c.vel.set(0, 0, 0); plantCharge(state, c, 1 / 64); tick(1 / 64); }
-		put(c, 9.5, 19.4, 70); c.brain.crouch = true; put(S[1], 16.8, 18.4, 80); S[1].brain.crouch = true;
 		for (const b of B) b.alive = false;
 		put(B[0], 44, 2, 90);
 		p.nades.veil = 1; p.nadeSel = 'veil';
 		throwGrenade(state, p, false, 6, 1, 23.5);
 		run(tick, 240);
-		put(p, 22.5, 21.6, 88, -.12);
+		put(p, 22.5, 21.6, 88, -.12); put(c, 9.5, 19.4, 70); put(S[1], 16.8, 18.4, 80);
+		c.crouch = S[1].crouch = 1; c.speed = S[1].speed = 0;
 	} else {
 		put(p, 3, -20.5, -60, -.06); score(state, 6, 2, 2); state.roundsPlayed = 4;
 		put(S[0], 9, -25, -40); put(S[1], 13.5, -29.5, 30);

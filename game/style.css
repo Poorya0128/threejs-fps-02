@@ -28,7 +28,7 @@ html,body{margin:0;height:100%;overflow:hidden;background:#000;color:var(--ink);
 #feed .r{color:var(--mute);font-style:italic;border-color:transparent}
 #feed .k{border-color:var(--amber)}
 #feed em{font-style:normal;color:var(--mute);margin:0 6px}
-.hs{color:var(--amber);margin-left:6px;vertical-align:-2px}
+.hs{width:14px;fill:none;stroke:var(--amber);stroke-width:1.6;margin-left:6px;vertical-align:-2px}
 #vit{left:14px;bottom:14px;width:250px;padding:10px 14px}
 .row+.row{margin-top:6px}
 .big{font-size:34px;font-weight:700;line-height:1}
@@ -59,11 +59,9 @@ html,body{margin:0;height:100%;overflow:hidden;background:#000;color:var(--ink);
 #cross i:nth-child(1){left:calc(-8px - var(--g))}
 #cross i:nth-child(n+3){width:2px;height:7px;left:-1px;top:calc(1px + var(--g))}
 #cross i:nth-child(3){top:calc(-8px - var(--g))}
-#hit{left:50%;top:50%;width:26px;height:26px;margin:-13px;opacity:0;transition:opacity .2s}
+#hit{left:50%;top:50%;width:26px;margin:-13px;opacity:0;transition:opacity .2s;stroke:#fff;stroke-width:2;filter:drop-shadow(0 0 1px #000)}
 #hit.on{opacity:1;transition:none;animation:hit .12s ease-out}
-#hit i{position:absolute;left:12px;top:8px;width:2px;height:9px;background:#fff;box-shadow:0 0 0 1px rgba(0,0,0,.5);transform:rotate(45deg) translateY(-14px)}
-#hit i+i{rotate:90deg}#hit i+i+i{rotate:180deg}#hit i+i+i+i{rotate:270deg}
-#hit.hs i{background:var(--red)}
+#hit.hs{stroke:var(--red)}
 #banner{left:0;right:0;top:24%;text-align:center}
 #banner:before{content:"";display:block;margin:0 auto 12px;width:220px;height:2px;background:linear-gradient(90deg,transparent,var(--amber),transparent)}
 #banner h1{margin:0;font-size:40px;letter-spacing:.32em}
@@ -80,11 +78,11 @@ html,body{margin:0;height:100%;overflow:hidden;background:#000;color:var(--ink);
 #vig{opacity:0;background:radial-gradient(ellipse,transparent 55%,rgba(200,20,10,.65))}
 #vig.low{animation:pulse .6s infinite alternate}
 #buy,#board{top:50%;transform:translate(-50%,-50%)}
-#buy{width:700px;padding:18px 22px;pointer-events:auto}
+#buy{width:560px;padding:18px 22px;pointer-events:auto}
 #buy header{display:flex;justify-content:space-between;align-items:baseline;border-bottom:1px solid var(--line);padding-bottom:8px;margin-bottom:12px}
 #buy h3{margin:0;font-size:18px;letter-spacing:.3em}
 .cr{color:var(--amber);font-size:20px;font-weight:700}
-.cols{display:grid;grid-template-columns:repeat(3,1fr);gap:12px}
+.cols{display:grid;grid-template-columns:1fr 1fr;gap:12px}
 .cols p{margin:0 0 6px}
 .it{display:grid;grid-template-columns:18px 1fr auto;gap:2px 8px;padding:7px 9px;margin-bottom:6px;background:rgba(255,255,255,.04);border-left:2px solid transparent;cursor:pointer}
 .it:hover{background:rgba(240,160,60,.12);border-color:var(--amber)}

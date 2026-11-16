@@ -3,6 +3,7 @@ import { Mesh, Sprite, SpriteMaterial, MeshBasicMaterial, MeshStandardMaterial, 
 	Points, PointsMaterial, BufferGeometry, BufferAttribute, PointLight, Vector3, Color } from 'three';
 import { mulberry32 } from '../math.js';
 import { canvasTex } from './mesh.js';
+import { ROUND } from '../config.js';
 
 const _a = new Vector3(), METAL = new Set([2, 3, 4, 9, 10, 11]), hot = (r, g, b) => new Color(r, g, b), glow = { transparent: true, blending: AdditiveBlending, depthWrite: false };
 const disc = (x, cx, cy, r, fill) => { x.fillStyle = fill; x.beginPath(); x.arc(cx, cy, r, 0, 7); x.fill(); };
@@ -102,7 +103,7 @@ export function createFx(scene) {
 			for (let i = 0; i < 8; i++) { const g = state.nades[i], m = nades[i]; m.visible = g.active; m.position.set(g.x, g.y, g.z); m.rotation.x += dt * 8; }
 			const F = state.fuse;
 			fuse.visible = F.planted || F.dropped;
-			const blink = F.planted ? (Math.sin(state.time * (6 + 30 * (1 - state.roundT / 40))) > 0 ? 1 : .15) : .3;
+			const blink = F.planted ? (Math.sin(state.time * (6 + 30 * (1 - state.roundT / ROUND.fuseTime))) > 0 ? 1 : .15) : .3;
 			fuse.position.set(F.x, .065, F.z); led.material.emissiveIntensity = 8 * blink; fuseLight.intensity = F.planted ? 6 * blink : 0;
 		},
 	};

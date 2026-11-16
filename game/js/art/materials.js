@@ -38,7 +38,6 @@ void surface(out vec3 c,out float r,out float h,out float mt){
 	c*=(.82+.34*f)*(1.-.5*cr)*(1.-.4*wet);h=mix(f*.6-cr,0.,wet);r=mix(r,.06,wet);}
 	else if(P==7){float v=vor(vW.xz*2.6)+.35*n,rg=aline(v,.025)*.6;c*=(.9+.12*f)*(1.-.08*smoothstep(.25,.0,v))*(.92+.1*fbm(vW*.3));
 	c=mix(c,vec3(.97,.96,.94),rg*.5);h=rg*.9+f*.35;r=mix(r,.3,step(.94,n3(vW*55.)));}
-	else if(P==8){float w=sin(q.x*300.)*sin(q.y*300.);h=w*.15+n*.4;c*=.94+.06*w;}
 	else if(P==9){h=f*.5;r+=.1*f;}
 	else if(P==10){vec2 b=q/vec2(.4,.2);b.x+=floor(b.y)*.5;float m=grid(b,vec2(1.),.025);
 	c*=(.88+.24*h3(vec3(floor(b),4.)))*(1.-.35*m);h=h*.4-m*.7;}
@@ -85,7 +84,7 @@ export function procMaterial(o) {
 }
 
 // World presets by map material id. pat: 0 formwork concrete, 1 plaster over brick, 2 metal, 3 corrugated, 4 planks,
-// 5 hazard, 6 asphalt, 7 salt crust, 8 cloth, 9 polymer, 10 block masonry, 11 brine, 12 character.
+// 5 hazard, 6 asphalt, 7 salt crust, 9 polymer, 10 block masonry, 11 brine, 12 character.
 const tin = (c, c2, o) => ({ c, c2, pat: 3, scale: .7, r0: .5, r1: .75, metal: .15, bump: .04, dirt: .6, rime: .5, wear: 1, ...o });
 export const WORLD = [
 	{ c: 0xb9b2a4, pat: 0, scale: .6, cvar: .1, r0: .75, r1: .95, bump: .025, dirt: 1, rime: 1, wear: .6 },

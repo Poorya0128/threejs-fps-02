@@ -6,7 +6,7 @@ export const MOVE = {
 	speed: { pistol: 5.7, smg: 5.6, rifle: 5.1, marksman: 4.6 }, walkMul: .52, crouchMul: .34, scopeMul: .6,
 	radius: .32, heightStand: 1.8, heightCrouch: 1.25, eyeStand: 1.62, eyeCrouch: 1.12, crouchTime: .12, stepUp: .4, stepStride: .38,
 };
-export const ROUND = { buyTime: 12, liveTime: 105, fuseTime: 40, postTime: 5, winRounds: 7, swapAfter: 6, plantTime: 3, defuseTime: 5 };
+export const ROUND = { buyTime: 12, liveTime: 105, fuseTime: 35, postTime: 5, winRounds: 7, swapAfter: 6, plantTime: 3, defuseTime: 7 };
 export const ECON = {
 	start: 900, cap: 12000, winElim: 3000, winObjective: 3300, loss: 1500, lossBonus: 400, lossMax: 3100, plant: 300, plantLossBonus: 600,
 	kill: { pistol: 250, smg: 550, rifle: 250, marksman: 100 },
@@ -36,8 +36,7 @@ export const THROW = { full: 16, lob: 8, up: 2.5, gravity: 15, bounce: .45, cool
 // Buy menu columns: [title, [[id, key, note]]].
 export const BUY = [
 	['WEAPONS', [['hornet', '1', '850 rpm · forgiving on the move'], ['talon', '2', '34 dmg · strong climb'], ['gavel', '3', '31 dmg · tight, flat spray'], ['longbow', '4', '112 dmg · two-step scope']]],
-	['GEAR', [['armor', '5', 'absorbs half of body damage'], ['helm', '6', 'vest and head cover']]],
-	['UTILITY', [['shard', '7', 'frag · falls off over 6 m'], ['veil', '8', 'smoke · 15 s, blocks sight']]],
+	['GEAR · UTILITY', [['armor', '5', 'absorbs half of body damage'], ['helm', '6', 'vest and head cover'], ['shard', '7', 'frag · falls off over 6 m'], ['veil', '8', 'smoke · 15 s, blocks sight']]],
 ];
 export const BUY_KEYS = Object.fromEntries(BUY.flatMap(([, items]) => items.map(([id, key]) => [key, id])));
 export const HIT = { head: 4, headHelm: 2.4, chest: 1, stomach: 1, arm: .9, leg: .75 }, ARMOR_RATIO = .5;

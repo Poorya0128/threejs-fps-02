@@ -1,4 +1,6 @@
 // WebAudio synthesis of the noise ring, panned and muffled by distance, with a generated reverb.
+import { ROUND } from './config.js';
+
 let ctx = null, out = null, verb = null, noise = null;
 const buffer = (ch, len, fill) => { const b = ctx.createBuffer(ch, len, ctx.sampleRate); for (let c = 0; c < ch; c++) b.getChannelData(c).forEach((_, i, d) => { d[i] = fill(i / len); }); return b; };
 const gain = (v, to) => { const g = ctx.createGain(); g.gain.value = v; g.connect(to); return g; };
@@ -49,7 +51,7 @@ export function createAudio() {
 			if (p.reloadT > 0 && !reload) for (const [k, f] of [[0, 3200], [.35, 1800], [.75, 2600]]) voice(t + k, { f, q: 4, dur: .05, gain: .3 });
 			reload = p.reloadT > 0;
 			if (p.lastHit.t !== hit) voice(t, p.lastHit.head ? { osc: 'sine', f: 2100, f1: 1700, dur: .16, gain: .25, wet: 0 } : { f: 6000, q: 2, dur: .03, gain: .2, wet: 0 });
-			if (state.phase === 'planted' && state.time >= beep) { beep = state.time + .15 + .85 * state.roundT / 40; voice(t, { osc: 'sine', f: 1450, dur: .07, gain: .18, wet: .2 }); }
+			if (state.phase === 'planted' && state.time >= beep) { beep = state.time + .15 + .85 * state.roundT / ROUND.fuseTime; voice(t, { osc: 'sine', f: 1450, dur: .07, gain: .18, wet: .2 }); }
 			hit = p.lastHit.t;
 		},
 	};

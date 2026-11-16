@@ -203,8 +203,9 @@ export function driveAgent(state, bot, dt) {
 		} else if (followRoute(state, bot, dt)) { gait = br.pieT > 0 ? .5 : 1; br.pieT -= dt; }
 		else if (br.state === 'fetch') { steer(bot, f.x, f.z, dt); gait = 1; if (!f.dropped) br.state = 'followRoute'; }
 		else if (br.hold >= 0) {
-			const n = state.nodes[br.hold], yaw = (n[5] ?? 0) * Math.PI / 180 + Math.sin(state.time * .5 + bot.id) * .5;
-			br.state = 'holdAngle'; crouch = br.crouch;
+			const n = state.nodes[br.hold], watch = f.planted && bot.team === 'strand'; // after the plant, Strand watches the Fuse
+			const yaw = (watch ? Math.atan2(bot.pos.x - f.x, bot.pos.z - f.z) : (n[5] ?? 0) * Math.PI / 180) + Math.sin(state.time * .5 + bot.id) * .5;
+			br.state = 'holdAngle'; crouch = br.crouch || watch;
 			aimAt(bot, bot.pos.x - Math.sin(yaw), bot.pos.y + bot.eyeHeight, bot.pos.z - Math.cos(yaw), dt, 3);
 		} else if (bot.team === 'strand') { const h = holds(state, SITE[state.attackSite]); goTo(state, bot, br.hold = h[bot.id % h.length]); }
 	}

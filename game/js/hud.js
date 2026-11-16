@@ -5,12 +5,11 @@ import { buyItem, priceOf, nameOf, owns } from './economy.js';
 import { siteAt } from './rounds.js';
 
 const PX = 2.6, S = 190, R = S / 2, AMBER = '#f0a03c', TEAL = '#3fb0a4', INK = 'rgba(236,230,218,', NADES = [['nS', 'shard'], ['nV', 'veil']];
-const HEAD = '<svg class="hs" width="14" height="14" viewBox="0 0 14 14" fill="none" stroke="currentColor" stroke-width="1.6"><circle cx="7" cy="7" r="5"/><path d="M7 0v4M7 10v4M0 7h4M10 7h4"/></svg>';
-const IDS = 'hp hpbar ar arm helm cash dCash mags ammo wname nS nV kit timer rnd scS scB pipS pipB feed cross hit banner bT bS prompt prog progL progB buy board scope radar vig';
+const HEAD = '<svg class="hs" viewBox="0 0 14 14"><circle cx="7" cy="7" r="5"/><path d="M7 0v4M7 10v4M0 7h4M10 7h4"/></svg>';
 
 export function createHud(map) {
 	const E = {}, last = {};
-	for (const id of IDS.split(' ')) E[id] = document.getElementById(id);
+	for (const e of document.querySelectorAll('#hud [id]')) E[e.id] = e;
 	const changed = (key, v) => { if (last[key] === v) return false; last[key] = v; return true; };
 	const text = (k, v) => { if (changed(k, v)) E[k].textContent = v; };
 	const html = (k, v) => { if (changed(k, v)) E[k].innerHTML = v; };

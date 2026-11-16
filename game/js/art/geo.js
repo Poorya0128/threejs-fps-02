@@ -57,7 +57,7 @@ export function buildWorld(scene, boxes, map) {
 	const W = WORLD.map(procMaterial), rng = mulberry32(7), meshes = new Map(), get = (m) => meshes.get(m) ?? meshes.set(m, new Bld()).get(m);
 	const salt = procMaterial({ c: 0xeae6de, pat: 7, scale: 2, r0: .7, r1: .95, bump: .05 }), rubber = procMaterial({ c: 0x1f1f20, pat: 9, r0: .6, r1: .8 });
 	const paintM = procMaterial({ c: 0x8a9a8e, c2: 0xa0623a, pat: 2, scale: .25, r0: .45, r1: .7, metal: .2, bump: .01, wear: 1, dirt: .5 });
-	const bags = procMaterial({ c: 0xa89a78, pat: 8, r0: .85, r1: 1, bump: .02, cvar: .15 }), bulb = new MeshStandardMaterial({ color: 0, emissive: 0xffc58a, emissiveIntensity: 9 });
+	const bags = procMaterial({ c: 0xa89a78, r0: .85, r1: 1, cvar: .15 }), bulb = new MeshStandardMaterial({ color: 0, emissive: 0xffc58a, emissiveIntensity: 9 });
 	const glass = new MeshStandardMaterial({ color: 0x1a2229, roughness: .05, metalness: .3, envMapIntensity: 2.4 });
 	const glassLit = new MeshStandardMaterial({ color: 0x1a1410, roughness: .1, emissive: 0xffa860, emissiveIntensity: .9 });
 	const conc = get(W[0]), steel = get(W[2]), pipes = get(W[9]), box = (B, mn, mx, r = .02, t = 1) => boxInto(B, mn, mx, r, t);
@@ -97,7 +97,6 @@ export function buildWorld(scene, boxes, map) {
 			pipes.add(new CylinderGeometry(r, r, h - .6, 40, 6, true), at(x, (h - .6) / 2, z));
 			pipes.add(new SphereGeometry(r, 40, 8, 0, 6.3, 0, .5), at(x, h - .6 - r * Math.cos(.5), z));
 			for (let y = .6; y < h - .8; y += 1.4) steel.add(new CylinderGeometry(r + .04, r + .04, .09, 40, 1), at(x, y, z), 1);
-			box(steel, [x + r - .02, .3, z - .25], [x + r + .08, h - .4, z - .2], .01);
 			box(conc, [x - r - .2, 0, z - r - .2], [x + r + .2, .3, z + r + .2], .04);
 		},
 		pile(x, z, r, h) { get(salt).add(new LatheGeometry(Array.from({ length: 13 }, (_, k) => new Vector2(r * (1 - k / 12) * (1 + .06 * Math.sin(k * 3.1)), h * Math.sin(k / 12 * Math.PI / 2) ** .8)), 36), at(x, 0, z, 1, 1, .8)); },
@@ -114,7 +113,7 @@ export function buildWorld(scene, boxes, map) {
 			P.add(new CylinderGeometry(r, r, len, 48, 6, true), lying(xc, yc, z));
 			for (const s of [-1, 1]) P.add(new SphereGeometry(R, 48, 10, 0, 6.3, 0, .6), _m.makeRotationZ(-s * Math.PI / 2).setPosition(xc + s * (len / 2 - R * Math.cos(.6)), yc, z));
 			for (let x = x0 + .7; x < x1 - .5; x += 1.6) steel.add(new CylinderGeometry(r + .05, r + .05, .14, 48, 1), lying(x, yc, z), 1);
-			for (const x of [x0 + 1.4, x1 - 1.4]) box(conc, [x - .4, 0, z - r * .8], [x + .4, yc - r * .6, z + r * .8], .04);
+			for (const x of [x0 + 1.4, x1 - 1.4]) box(conc, [x - .4, 0, z - r * .8], [x + .4, yc - r * .6, z + r * .8], .04); // saddles
 			for (const x of [xc - 1.6, xc + 1.6]) tube(pipes, A.set(x, yc + r - .1, z), Bv.set(x, 7, z), .22, 16);
 		},
 		rail(x0, z0, x1, z1, y) {
